@@ -92,8 +92,22 @@ def test_group_by_solve_group(sample_config):
     assert "docs" in docs_names
 
 
-def test_resolve_feature_platform_intersection():
-    """Feature platforms are intersected and used when non-empty."""
+@pytest.mark.parametrize(
+    "feature_platforms, expected_platforms",
+    [
+        (
+            {"default": ["linux-64", "osx-arm64"], "narrow": ["linux-64"]},
+            ["linux-64"],
+        ),
+        (
+            {"default": None},
+            ["linux-64", "win-64"],
+        ),
+    ],
+    ids=["intersection-narrows", "no-feature-platforms-uses-workspace"],
+)
+def test_resolve_platforms(feature_platforms, expected_platforms):
+    """Feature platforms are intersected; fallback to workspace platforms."""
     from conda_workspaces.models import (
         Channel,
         Environment,
@@ -102,51 +116,35 @@ def test_resolve_feature_platform_intersection():
         WorkspaceConfig,
     )
 
-    feat_a = Feature(
-        name="default",
-        conda_dependencies={"python": MatchSpec("python")},
-        platforms=["linux-64", "osx-arm64"],
-    )
-    feat_b = Feature(
-        name="narrow",
-        platforms=["linux-64"],
-    )
-    config = WorkspaceConfig(
-        channels=[Channel("conda-forge")],
-        platforms=["linux-64", "osx-arm64", "win-64"],
-        features={"default": feat_a, "narrow": feat_b},
-        environments={
-            "default": Environment(name="default"),
-            "narrow": Environment(name="narrow", features=["narrow"]),
-        },
-    )
-    resolved = resolve_environment(config, "narrow")
-    assert resolved.platforms == ["linux-64"]
+    features = {}
+    for name, plats in feature_platforms.items():
+        kwargs = {"name": name}
+        if name == "default":
+            kwargs["conda_dependencies"] = {"python": MatchSpec("python")}
+        if plats is not None:
+            kwargs["platforms"] = plats
+        features[name] = Feature(**kwargs)
 
-
-def test_resolve_no_feature_platforms_uses_workspace():
-    """When no feature has platforms, workspace platforms are used."""
-    from conda_workspaces.models import (
-        Channel,
-        Environment,
-        Feature,
-        MatchSpec,
-        WorkspaceConfig,
-    )
+    env_name = list(feature_platforms.keys())[-1]
+    extra_features = [k for k in feature_platforms if k != "default"]
+    environments = {
+        "default": Environment(name="default"),
+    }
+    if env_name != "default":
+        environments[env_name] = Environment(
+            name=env_name, features=extra_features
+        )
 
     config = WorkspaceConfig(
         channels=[Channel("conda-forge")],
-        platforms=["linux-64", "win-64"],
-        features={
-            "default": Feature(
-                name="default",
-                conda_dependencies={"python": MatchSpec("python")},
-            ),
-        },
-        environments={"default": Environment(name="default")},
+        platforms=["linux-64", "osx-arm64", "win-64"]
+        if "narrow" in feature_platforms
+        else ["linux-64", "win-64"],
+        features=features,
+        environments=environments,
     )
-    resolved = resolve_environment(config, "default")
-    assert resolved.platforms == ["linux-64", "win-64"]
+    resolved = resolve_environment(config, env_name)
+    assert resolved.platforms == expected_platforms
 
 
 def test_resolve_activation_merged():

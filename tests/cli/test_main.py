@@ -118,7 +118,10 @@ def test_parser_args(
         ("activate", "conda_workspaces.cli.activate", "execute_activate"),
         ("shell", "conda_workspaces.cli.shell", "execute_shell"),
     ],
-    ids=["init", "install", "lock", "list", "info", "add", "remove", "clean", "run", "activate", "shell"],
+    ids=[
+        "init", "install", "lock", "list", "info",
+        "add", "remove", "clean", "run", "activate", "shell",
+    ],
 )
 def test_execute_dispatches_to_subcommand(
     monkeypatch: pytest.MonkeyPatch,

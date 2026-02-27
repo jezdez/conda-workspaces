@@ -23,8 +23,14 @@ def _make_args(**kwargs) -> argparse.Namespace:
 @pytest.mark.parametrize(
     "env_name, expected_fragments",
     [
-        ("default", ["Environment: default", "Installed:   no", "conda-forge"]),
-        ("test", ["Environment: test"]),
+        (
+            "default",
+            ["Environment: default", "Installed:   no", "conda-forge", "python"],
+        ),
+        (
+            "test",
+            ["Environment: test", "python", "pytest", "Solve group: default"],
+        ),
     ],
     ids=["default-text", "named-env"],
 )
@@ -64,28 +70,6 @@ def test_info_installed_env(
     assert "Packages:    3" in out
 
 
-@pytest.mark.parametrize(
-    "env_name, expected_deps",
-    [
-        ("default", ["python"]),
-        ("test", ["python", "pytest"]),
-    ],
-    ids=["default-deps", "test-deps"],
-)
-def test_info_shows_dependencies(
-    pixi_workspace: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    env_name: str,
-    expected_deps: list[str],
-) -> None:
-    monkeypatch.chdir(pixi_workspace)
-    args = _make_args(env_name=env_name)
-    execute_info(args)
-    out = capsys.readouterr().out
-    for dep in expected_deps:
-        assert dep in out
-
 
 def test_info_json_output(
     pixi_workspace: Path,
@@ -101,18 +85,6 @@ def test_info_json_output(
     assert "conda_dependencies" in data
     assert "channels" in data
 
-
-def test_info_shows_solve_group(
-    pixi_workspace: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """Test environment shows solve group in text output."""
-    monkeypatch.chdir(pixi_workspace)
-    args = _make_args(env_name="test")
-    execute_info(args)
-    out = capsys.readouterr().out
-    assert "Solve group: default" in out
 
 
 def test_info_shows_pypi_dependencies(

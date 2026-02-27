@@ -43,25 +43,23 @@ def test_envs_dir(config: WorkspaceConfig) -> None:
     assert ctx.envs_dir == Path(config.root) / ".conda" / "envs"
 
 
-def test_platform_cached(
-    config: WorkspaceConfig, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    "cache_key, value_a, value_b",
+    [
+        ("platform", "linux-64", "osx-arm64"),
+        ("root_prefix", Path("/fake/root"), Path("/other/root")),
+    ],
+    ids=["platform", "root-prefix"],
+)
+def test_cached_property(
+    config: WorkspaceConfig, cache_key: str, value_a, value_b
 ) -> None:
-    """platform property lazily imports from conda and caches the result."""
+    """Cached properties return values from the internal cache."""
     ctx = WorkspaceContext(config)
-
-    # Inject a fake value into the cache to avoid a real conda import
-    ctx._cache["platform"] = "linux-64"
-    assert ctx.platform == "linux-64"
-
-    # Second access returns the cached value (not re-evaluated)
-    ctx._cache["platform"] = "osx-arm64"
-    assert ctx.platform == "osx-arm64"
-
-
-def test_root_prefix_cached(config: WorkspaceConfig) -> None:
-    ctx = WorkspaceContext(config)
-    ctx._cache["root_prefix"] = Path("/fake/root")
-    assert ctx.root_prefix == Path("/fake/root")
+    ctx._cache[cache_key] = value_a
+    assert getattr(ctx, cache_key) == value_a
+    ctx._cache[cache_key] = value_b
+    assert getattr(ctx, cache_key) == value_b
 
 
 def test_config_lazy_loads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

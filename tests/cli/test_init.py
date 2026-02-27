@@ -149,7 +149,9 @@ def test_init_default_channels(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     assert doc["workspace"]["channels"] == ["conda-forge"]
 
 
-def test_init_detects_platforms(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_init_detects_platforms(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """When no platforms argument given, _detect_platforms is called."""
     monkeypatch.chdir(tmp_path)
     args = _make_args(manifest_format="pixi", name="auto-plat", platforms=None)

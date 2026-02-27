@@ -31,9 +31,18 @@ def test_has_workspace(parser, sample_pyproject_toml):
     assert parser.has_workspace(sample_pyproject_toml)
 
 
-def test_has_workspace_no_pixi(parser, tmp_path):
+@pytest.mark.parametrize(
+    "content",
+    [
+        pytest.param('[project]\nname = "foo"\n', id="no-pixi-table"),
+        pytest.param(None, id="missing-file"),
+        pytest.param("{{invalid toml", id="bad-toml"),
+    ],
+)
+def test_has_workspace_false(parser, tmp_path, content):
     path = tmp_path / "pyproject.toml"
-    path.write_text('[project]\nname = "foo"\n', encoding="utf-8")
+    if content is not None:
+        path.write_text(content, encoding="utf-8")
     assert not parser.has_workspace(path)
 
 
@@ -97,11 +106,19 @@ python = ">=3.12"
     assert "python" in default.conda_dependencies
 
 
-def test_no_workspace_raises(parser, tmp_path):
+@pytest.mark.parametrize(
+    "content",
+    [
+        pytest.param('[project]\nname = "foo"\n', id="no-workspace-table"),
+        pytest.param("{{invalid toml", id="bad-toml"),
+    ],
+)
+def test_parse_error(parser, tmp_path, content):
+    """Missing workspace or malformed TOML raises WorkspaceParseError."""
     from conda_workspaces.exceptions import WorkspaceParseError
 
     path = tmp_path / "pyproject.toml"
-    path.write_text('[project]\nname = "foo"\n', encoding="utf-8")
+    path.write_text(content, encoding="utf-8")
     with pytest.raises(WorkspaceParseError):
         parser.parse(path)
 
@@ -135,26 +152,7 @@ python = ">=3.10"
     assert str(default.conda_dependencies["python"].version) == ">=3.12"
 
 
-def test_has_workspace_missing_file(parser, tmp_path):
-    """Non-existent file returns False."""
-    assert not parser.has_workspace(tmp_path / "pyproject.toml")
 
-
-def test_has_workspace_bad_toml(parser, tmp_path):
-    """Malformed TOML returns False instead of raising."""
-    path = tmp_path / "pyproject.toml"
-    path.write_text("{{invalid toml", encoding="utf-8")
-    assert not parser.has_workspace(path)
-
-
-def test_parse_bad_toml_raises(parser, tmp_path):
-    """Malformed TOML raises WorkspaceParseError."""
-    from conda_workspaces.exceptions import WorkspaceParseError
-
-    path = tmp_path / "pyproject.toml"
-    path.write_text("{{invalid toml", encoding="utf-8")
-    with pytest.raises(WorkspaceParseError):
-        parser.parse(path)
 
 
 def test_parse_activation(parser, tmp_path):

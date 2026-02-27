@@ -31,8 +31,18 @@ def test_has_workspace(parser, sample_pixi_toml):
     assert parser.has_workspace(sample_pixi_toml)
 
 
-def test_has_workspace_missing_file(parser, tmp_path):
-    assert not parser.has_workspace(tmp_path / "pixi.toml")
+@pytest.mark.parametrize(
+    "content",
+    [
+        pytest.param(None, id="missing-file"),
+        pytest.param("{{invalid toml", id="bad-toml"),
+    ],
+)
+def test_has_workspace_false(parser, tmp_path, content):
+    path = tmp_path / "pixi.toml"
+    if content is not None:
+        path.write_text(content, encoding="utf-8")
+    assert not parser.has_workspace(path)
 
 
 def test_parse_basic(parser, sample_pixi_toml):
@@ -158,28 +168,17 @@ dev = ["test", "lint"]
     assert env.features == ["test", "lint"]
 
 
-def test_has_workspace_bad_toml(parser, tmp_path):
-    """Malformed TOML returns False instead of raising."""
-    path = tmp_path / "pixi.toml"
-    path.write_text("{{invalid toml", encoding="utf-8")
-    assert not parser.has_workspace(path)
-
-
-def test_parse_bad_toml_raises(parser, tmp_path):
-    """Malformed TOML raises WorkspaceParseError."""
+@pytest.mark.parametrize(
+    "content",
+    [
+        pytest.param("{{invalid toml", id="bad-toml"),
+        pytest.param('[dependencies]\npython = ">=3.10"\n', id="no-workspace-table"),
+    ],
+)
+def test_parse_error(parser, tmp_path, content):
+    """Malformed TOML or missing [workspace] raises WorkspaceParseError."""
     from conda_workspaces.exceptions import WorkspaceParseError
 
-    path = tmp_path / "pixi.toml"
-    path.write_text("{{invalid toml", encoding="utf-8")
-    with pytest.raises(WorkspaceParseError):
-        parser.parse(path)
-
-
-def test_parse_no_workspace_table(parser, tmp_path):
-    """Missing [workspace] and [project] raises WorkspaceParseError."""
-    from conda_workspaces.exceptions import WorkspaceParseError
-
-    content = '[dependencies]\npython = ">=3.10"\n'
     path = tmp_path / "pixi.toml"
     path.write_text(content, encoding="utf-8")
     with pytest.raises(WorkspaceParseError):
