@@ -64,6 +64,28 @@ def test_root_prefix_cached(config: WorkspaceConfig) -> None:
     assert ctx.root_prefix == Path("/fake/root")
 
 
+def test_config_lazy_loads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """config property calls detect_and_parse when no config is given."""
+    expected_config = WorkspaceConfig(
+        name="lazy-test",
+        root=str(tmp_path),
+        channels=[Channel("conda-forge")],
+        platforms=["linux-64"],
+        features={"default": Feature(name="default")},
+        environments={"default": Environment(name="default")},
+    )
+
+    def fake_detect_and_parse(path=None):
+        return (tmp_path / "pixi.toml", expected_config)
+
+    monkeypatch.setattr(
+        "conda_workspaces.parsers.detect_and_parse", fake_detect_and_parse
+    )
+
+    ctx = WorkspaceContext()  # no config passed
+    assert ctx.config.name == "lazy-test"
+
+
 @pytest.mark.parametrize(
     "platforms, cached_platform, expected",
     [

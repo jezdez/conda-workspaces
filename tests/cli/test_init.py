@@ -147,3 +147,25 @@ def test_init_default_channels(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     execute_init(args)
     doc = tomlkit.loads((tmp_path / "pixi.toml").read_text(encoding="utf-8"))
     assert doc["workspace"]["channels"] == ["conda-forge"]
+
+
+def test_init_detects_platforms(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """When no platforms argument given, _detect_platforms is called."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(manifest_format="pixi", name="auto-plat", platforms=None)
+    execute_init(args)
+    doc = tomlkit.loads((tmp_path / "pixi.toml").read_text(encoding="utf-8"))
+    platforms = doc["workspace"]["platforms"]
+    assert len(platforms) >= 4
+    assert "linux-64" in platforms
+
+
+def test_init_unknown_format(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unknown format returns 1 without creating files."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(manifest_format="unknown", name="test")
+    result = execute_init(args)
+    assert result == 1
+    assert not (tmp_path / "pixi.toml").exists()
+    assert not (tmp_path / "conda.toml").exists()
+    assert not (tmp_path / "pyproject.toml").exists()

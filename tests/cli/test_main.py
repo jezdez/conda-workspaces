@@ -101,3 +101,44 @@ def test_parser_args(
     parser = generate_parser()
     parsed = parser.parse_args(args)
     assert getattr(parsed, expected_attr) == expected_value
+
+
+@pytest.mark.parametrize(
+    "subcmd, module_attr, func_name",
+    [
+        ("init", "conda_workspaces.cli.init", "execute_init"),
+        ("install", "conda_workspaces.cli.install", "execute_install"),
+        ("lock", "conda_workspaces.cli.lock", "execute_lock"),
+        ("list", "conda_workspaces.cli.list", "execute_list"),
+        ("info", "conda_workspaces.cli.info", "execute_info"),
+        ("add", "conda_workspaces.cli.add", "execute_add"),
+        ("remove", "conda_workspaces.cli.remove", "execute_remove"),
+        ("clean", "conda_workspaces.cli.clean", "execute_clean"),
+        ("run", "conda_workspaces.cli.run", "execute_run"),
+        ("activate", "conda_workspaces.cli.activate", "execute_activate"),
+        ("shell", "conda_workspaces.cli.shell", "execute_shell"),
+    ],
+    ids=["init", "install", "lock", "list", "info", "add", "remove", "clean", "run", "activate", "shell"],
+)
+def test_execute_dispatches_to_subcommand(
+    monkeypatch: pytest.MonkeyPatch,
+    subcmd: str,
+    module_attr: str,
+    func_name: str,
+) -> None:
+    """Each subcommand dispatches to the correct execute_* function."""
+    import importlib
+
+    calls: list[str] = []
+
+    def fake_handler(args):
+        calls.append(subcmd)
+        return 0
+
+    mod = importlib.import_module(module_attr)
+    monkeypatch.setattr(mod, func_name, fake_handler)
+
+    args = argparse.Namespace(subcmd=subcmd)
+    result = execute(args)
+    assert result == 0
+    assert calls == [subcmd]

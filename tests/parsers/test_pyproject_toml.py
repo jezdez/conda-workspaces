@@ -133,3 +133,121 @@ python = ">=3.10"
     # Should use conda table (>=3.12), not pixi (>=3.10)
     default = config.features["default"]
     assert str(default.conda_dependencies["python"].version) == ">=3.12"
+
+
+def test_has_workspace_missing_file(parser, tmp_path):
+    """Non-existent file returns False."""
+    assert not parser.has_workspace(tmp_path / "pyproject.toml")
+
+
+def test_has_workspace_bad_toml(parser, tmp_path):
+    """Malformed TOML returns False instead of raising."""
+    path = tmp_path / "pyproject.toml"
+    path.write_text("{{invalid toml", encoding="utf-8")
+    assert not parser.has_workspace(path)
+
+
+def test_parse_bad_toml_raises(parser, tmp_path):
+    """Malformed TOML raises WorkspaceParseError."""
+    from conda_workspaces.exceptions import WorkspaceParseError
+
+    path = tmp_path / "pyproject.toml"
+    path.write_text("{{invalid toml", encoding="utf-8")
+    with pytest.raises(WorkspaceParseError):
+        parser.parse(path)
+
+
+def test_parse_activation(parser, tmp_path):
+    """Activation scripts and env vars are parsed."""
+    content = """\
+[project]
+name = "act-test"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.dependencies]
+python = ">=3.10"
+
+[tool.pixi.activation]
+scripts = ["setup.sh"]
+
+[tool.pixi.activation.env]
+MY_VAR = "hello"
+"""
+    path = tmp_path / "pyproject.toml"
+    path.write_text(content, encoding="utf-8")
+    config = parser.parse(path)
+    default = config.features["default"]
+    assert default.activation_scripts == ["setup.sh"]
+    assert default.activation_env == {"MY_VAR": "hello"}
+
+
+def test_parse_system_requirements(parser, tmp_path):
+    """System requirements are parsed."""
+    content = """\
+[project]
+name = "sysreq-test"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.system-requirements]
+linux = "5.10"
+"""
+    path = tmp_path / "pyproject.toml"
+    path.write_text(content, encoding="utf-8")
+    config = parser.parse(path)
+    default = config.features["default"]
+    assert default.system_requirements == {"linux": "5.10"}
+
+
+def test_parse_feature_activation(parser, tmp_path):
+    """Feature-level activation in pyproject.toml."""
+    content = """\
+[project]
+name = "feat-act"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.feature.dev.dependencies]
+python = ">=3.10"
+
+[tool.pixi.feature.dev.activation]
+scripts = ["dev.sh"]
+
+[tool.pixi.feature.dev.activation.env]
+DEV = "1"
+"""
+    path = tmp_path / "pyproject.toml"
+    path.write_text(content, encoding="utf-8")
+    config = parser.parse(path)
+    dev = config.features["dev"]
+    assert dev.activation_scripts == ["dev.sh"]
+    assert dev.activation_env == {"DEV": "1"}
+
+
+def test_parse_feature_system_requirements(parser, tmp_path):
+    """Feature-level system-requirements in pyproject.toml."""
+    content = """\
+[project]
+name = "feat-sysreq"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.feature.gpu.dependencies]
+cudatoolkit = "*"
+
+[tool.pixi.feature.gpu.system-requirements]
+cuda = "11.8"
+"""
+    path = tmp_path / "pyproject.toml"
+    path.write_text(content, encoding="utf-8")
+    config = parser.parse(path)
+    assert config.features["gpu"].system_requirements == {"cuda": "11.8"}

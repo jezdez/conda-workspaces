@@ -177,3 +177,81 @@ def test_config_merged_channels_deduplication():
     channels = config.merged_channels(env)
     canonical = [ch.canonical_name for ch in channels]
     assert canonical.count("conda-forge") == 1
+
+
+def test_config_post_init_invalid_platform():
+    from conda_workspaces.exceptions import PlatformError
+
+    with pytest.raises(PlatformError):
+        WorkspaceConfig(platforms=["not-a-real-platform"])
+
+
+def test_config_resolve_features_unknown_feature():
+    from conda_workspaces.exceptions import FeatureNotFoundError
+
+    config = WorkspaceConfig(
+        features={"default": Feature(name="default")},
+        environments={
+            "default": Environment(name="default"),
+            "broken": Environment(name="broken", features=["nonexistent"]),
+        },
+    )
+    with pytest.raises(FeatureNotFoundError):
+        config.resolve_features(config.environments["broken"])
+
+
+def test_config_merged_conda_deps_with_target():
+    default_feat = Feature(
+        name="default",
+        conda_dependencies={"python": MatchSpec("python >=3.10")},
+        target_conda_dependencies={
+            "linux-64": {"gcc": MatchSpec("gcc >=12")},
+        },
+    )
+    config = WorkspaceConfig(
+        features={"default": default_feat},
+        environments={"default": Environment(name="default")},
+    )
+    env = config.environments["default"]
+    merged = config.merged_conda_dependencies(env, platform="linux-64")
+    assert "python" in merged
+    assert "gcc" in merged
+
+
+def test_config_merged_pypi_deps_with_target():
+    from conda_workspaces.models import PyPIDependency
+
+    default_feat = Feature(
+        name="default",
+        pypi_dependencies={"requests": PyPIDependency(name="requests", spec=">=2.28")},
+        target_pypi_dependencies={
+            "linux-64": {"uvloop": PyPIDependency(name="uvloop", spec=">=0.17")},
+        },
+    )
+    config = WorkspaceConfig(
+        features={"default": default_feat},
+        environments={"default": Environment(name="default")},
+    )
+    env = config.environments["default"]
+    merged = config.merged_pypi_dependencies(env, platform="linux-64")
+    assert "requests" in merged
+    assert "uvloop" in merged
+
+
+def test_config_merged_channels_feature_adds_new():
+    default_feat = Feature(name="default")
+    extra_feat = Feature(name="bio", channels=[Channel("bioconda")])
+    config = WorkspaceConfig(
+        channels=[Channel("conda-forge")],
+        features={"default": default_feat, "bio": extra_feat},
+        environments={
+            "default": Environment(name="default"),
+            "bio": Environment(name="bio", features=["bio"]),
+        },
+    )
+    env = config.environments["bio"]
+    channels = config.merged_channels(env)
+    canonical = [ch.canonical_name for ch in channels]
+    assert "conda-forge" in canonical
+    assert "bioconda" in canonical
+    assert len(canonical) == 2

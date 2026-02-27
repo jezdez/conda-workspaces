@@ -156,3 +156,92 @@ dev = ["test", "lint"]
     config = parser.parse(path)
     env = config.environments["dev"]
     assert env.features == ["test", "lint"]
+
+
+def test_has_workspace_bad_toml(parser, tmp_path):
+    """Malformed TOML returns False instead of raising."""
+    path = tmp_path / "pixi.toml"
+    path.write_text("{{invalid toml", encoding="utf-8")
+    assert not parser.has_workspace(path)
+
+
+def test_parse_bad_toml_raises(parser, tmp_path):
+    """Malformed TOML raises WorkspaceParseError."""
+    from conda_workspaces.exceptions import WorkspaceParseError
+
+    path = tmp_path / "pixi.toml"
+    path.write_text("{{invalid toml", encoding="utf-8")
+    with pytest.raises(WorkspaceParseError):
+        parser.parse(path)
+
+
+def test_parse_no_workspace_table(parser, tmp_path):
+    """Missing [workspace] and [project] raises WorkspaceParseError."""
+    from conda_workspaces.exceptions import WorkspaceParseError
+
+    content = '[dependencies]\npython = ">=3.10"\n'
+    path = tmp_path / "pixi.toml"
+    path.write_text(content, encoding="utf-8")
+    with pytest.raises(WorkspaceParseError):
+        parser.parse(path)
+
+
+def test_parse_system_requirements(tmp_path):
+    """Top-level system-requirements are parsed into the default feature."""
+    content = """\
+[workspace]
+name = "sysreq-test"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[system-requirements]
+linux = "5.10"
+cuda = "12.0"
+"""
+    path = tmp_path / "pixi.toml"
+    path.write_text(content, encoding="utf-8")
+    config = PixiTomlParser().parse(path)
+    default = config.features["default"]
+    assert default.system_requirements == {"linux": "5.10", "cuda": "12.0"}
+
+
+def test_parse_feature_system_requirements(tmp_path):
+    """Feature-level system-requirements are parsed."""
+    content = """\
+[workspace]
+name = "feat-sysreq"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[feature.gpu.dependencies]
+cudatoolkit = "*"
+
+[feature.gpu.system-requirements]
+cuda = "11.8"
+"""
+    path = tmp_path / "pixi.toml"
+    path.write_text(content, encoding="utf-8")
+    config = PixiTomlParser().parse(path)
+    assert config.features["gpu"].system_requirements == {"cuda": "11.8"}
+
+
+def test_parse_feature_activation(tmp_path):
+    """Feature-level activation scripts and env vars are parsed."""
+    content = """\
+[workspace]
+name = "feat-act"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[feature.dev.activation]
+scripts = ["dev-setup.sh"]
+
+[feature.dev.activation.env]
+DEBUG = "1"
+"""
+    path = tmp_path / "pixi.toml"
+    path.write_text(content, encoding="utf-8")
+    config = PixiTomlParser().parse(path)
+    dev = config.features["dev"]
+    assert dev.activation_scripts == ["dev-setup.sh"]
+    assert dev.activation_env == {"DEBUG": "1"}

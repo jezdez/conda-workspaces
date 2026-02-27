@@ -164,3 +164,84 @@ def test_remove_prints_no_match(
     args = _make_args(file=pixi_toml, specs=["nonexistent"])
     execute_remove(args)
     assert "No matching" in capsys.readouterr().out
+
+
+def test_add_pypi_to_pyproject(pyproject_toml: Path) -> None:
+    """Adding PyPI deps to pyproject.toml writes to pypi-dependencies."""
+    args = _make_args(file=pyproject_toml, specs=["requests >=2.0"], pypi=True)
+    execute_add(args)
+    doc = tomlkit.loads(pyproject_toml.read_text(encoding="utf-8"))
+    assert doc["tool"]["pixi"]["pypi-dependencies"]["requests"] == ">=2.0"
+
+
+def test_add_to_pyproject_feature(pyproject_toml: Path) -> None:
+    """Adding deps to a feature in pyproject.toml."""
+    args = _make_args(file=pyproject_toml, specs=["pytest"], feature="test")
+    execute_add(args)
+    doc = tomlkit.loads(pyproject_toml.read_text(encoding="utf-8"))
+    assert doc["tool"]["pixi"]["feature"]["test"]["dependencies"]["pytest"] == "*"
+
+
+def test_remove_pypi_from_pyproject(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Removing PyPI deps from pyproject.toml."""
+    content = """\
+[project]
+name = "rm-pypi"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.pypi-dependencies]
+requests = ">=2.0"
+"""
+    path = tmp_path / "pyproject.toml"
+    path.write_text(content, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(file=path, specs=["requests"], pypi=True)
+    execute_remove(args)
+    doc = tomlkit.loads(path.read_text(encoding="utf-8"))
+    assert "requests" not in doc["tool"]["pixi"]["pypi-dependencies"]
+
+
+def test_remove_from_pyproject_feature(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Removing deps from a feature in pyproject.toml."""
+    content = """\
+[project]
+name = "rm-feat"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.feature.test.dependencies]
+pytest = ">=8.0"
+"""
+    path = tmp_path / "pyproject.toml"
+    path.write_text(content, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(file=path, specs=["pytest"], feature="test")
+    execute_remove(args)
+    doc = tomlkit.loads(path.read_text(encoding="utf-8"))
+    assert "pytest" not in doc["tool"]["pixi"]["feature"]["test"]["dependencies"]
+
+
+def test_remove_from_pyproject_no_table(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Removing from pyproject.toml with no tool table returns empty."""
+    content = """\
+[project]
+name = "no-tool"
+"""
+    path = tmp_path / "pyproject.toml"
+    path.write_text(content, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(file=path, specs=["numpy"])
+    result = execute_remove(args)
+    assert result == 0
+    assert "No matching" in capsys.readouterr().out

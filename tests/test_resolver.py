@@ -90,3 +90,94 @@ def test_group_by_solve_group(sample_config):
     assert None in groups
     docs_names = [r.name for r in groups[None]]
     assert "docs" in docs_names
+
+
+def test_resolve_feature_platform_intersection():
+    """Feature platforms are intersected and used when non-empty."""
+    from conda_workspaces.models import (
+        Channel,
+        Environment,
+        Feature,
+        MatchSpec,
+        WorkspaceConfig,
+    )
+
+    feat_a = Feature(
+        name="default",
+        conda_dependencies={"python": MatchSpec("python")},
+        platforms=["linux-64", "osx-arm64"],
+    )
+    feat_b = Feature(
+        name="narrow",
+        platforms=["linux-64"],
+    )
+    config = WorkspaceConfig(
+        channels=[Channel("conda-forge")],
+        platforms=["linux-64", "osx-arm64", "win-64"],
+        features={"default": feat_a, "narrow": feat_b},
+        environments={
+            "default": Environment(name="default"),
+            "narrow": Environment(name="narrow", features=["narrow"]),
+        },
+    )
+    resolved = resolve_environment(config, "narrow")
+    assert resolved.platforms == ["linux-64"]
+
+
+def test_resolve_no_feature_platforms_uses_workspace():
+    """When no feature has platforms, workspace platforms are used."""
+    from conda_workspaces.models import (
+        Channel,
+        Environment,
+        Feature,
+        MatchSpec,
+        WorkspaceConfig,
+    )
+
+    config = WorkspaceConfig(
+        channels=[Channel("conda-forge")],
+        platforms=["linux-64", "win-64"],
+        features={
+            "default": Feature(
+                name="default",
+                conda_dependencies={"python": MatchSpec("python")},
+            ),
+        },
+        environments={"default": Environment(name="default")},
+    )
+    resolved = resolve_environment(config, "default")
+    assert resolved.platforms == ["linux-64", "win-64"]
+
+
+def test_resolve_activation_merged():
+    """Activation scripts and env vars are merged across features."""
+    from conda_workspaces.models import (
+        Channel,
+        Environment,
+        Feature,
+        WorkspaceConfig,
+    )
+
+    default_feat = Feature(
+        name="default",
+        activation_scripts=["base.sh"],
+        activation_env={"BASE": "1"},
+    )
+    dev_feat = Feature(
+        name="dev",
+        activation_scripts=["dev.sh"],
+        activation_env={"DEV": "1"},
+    )
+    config = WorkspaceConfig(
+        channels=[Channel("conda-forge")],
+        platforms=["linux-64"],
+        features={"default": default_feat, "dev": dev_feat},
+        environments={
+            "default": Environment(name="default"),
+            "dev": Environment(name="dev", features=["dev"]),
+        },
+    )
+    resolved = resolve_environment(config, "dev")
+    assert "base.sh" in resolved.activation_scripts
+    assert "dev.sh" in resolved.activation_scripts
+    assert resolved.activation_env == {"BASE": "1", "DEV": "1"}
