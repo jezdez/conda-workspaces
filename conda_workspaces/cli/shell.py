@@ -29,9 +29,7 @@ def execute_shell(args: argparse.Namespace) -> int:
     env_name = getattr(args, "env_name", "default")
 
     if env_name not in config.environments:
-        raise EnvironmentNotFoundError(
-            env_name, list(config.environments.keys())
-        )
+        raise EnvironmentNotFoundError(env_name, list(config.environments.keys()))
 
     if not ctx.env_exists(env_name):
         raise EnvironmentNotInstalledError(env_name)

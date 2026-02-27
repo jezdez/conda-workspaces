@@ -38,9 +38,7 @@ def test_shell_spawns_default(
         spawn_calls.append({"prefix": prefix, "command": command})
         return 0
 
-    monkeypatch.setattr(
-        "conda_spawn.main.spawn", fake_spawn
-    )
+    monkeypatch.setattr("conda_spawn.main.spawn", fake_spawn)
 
     args = _make_args()
     result = execute_shell(args)
@@ -64,9 +62,7 @@ def test_shell_spawns_named_env(
         spawn_calls.append({"prefix": prefix, "command": command})
         return 0
 
-    monkeypatch.setattr(
-        "conda_spawn.main.spawn", fake_spawn
-    )
+    monkeypatch.setattr("conda_spawn.main.spawn", fake_spawn)
 
     args = _make_args(env_name="test")
     result = execute_shell(args)
@@ -88,9 +84,7 @@ def test_shell_with_command(
         spawn_calls.append({"prefix": prefix, "command": command})
         return 0
 
-    monkeypatch.setattr(
-        "conda_spawn.main.spawn", fake_spawn
-    )
+    monkeypatch.setattr("conda_spawn.main.spawn", fake_spawn)
 
     args = _make_args(cmd=["--", "python", "-c", "print(1)"])
     result = execute_shell(args)
@@ -112,9 +106,7 @@ def test_shell_strips_leading_dashdash(
         spawn_calls.append({"prefix": prefix, "command": command})
         return 0
 
-    monkeypatch.setattr(
-        "conda_spawn.main.spawn", fake_spawn
-    )
+    monkeypatch.setattr("conda_spawn.main.spawn", fake_spawn)
 
     # No leading --, just the command
     args = _make_args(cmd=["python"])
@@ -154,9 +146,7 @@ def test_shell_propagates_exit_code(
     def fake_spawn(*, prefix, command=None):
         return 42
 
-    monkeypatch.setattr(
-        "conda_spawn.main.spawn", fake_spawn
-    )
+    monkeypatch.setattr("conda_spawn.main.spawn", fake_spawn)
 
     args = _make_args()
     assert execute_shell(args) == 42
