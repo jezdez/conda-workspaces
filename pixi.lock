@@ -2868,8 +2868,8 @@ packages:
   timestamp: 1749630737894
 - pypi: ./
   name: conda-workspaces
-  version: 0.1.dev9+gf0f4eaaae.d20260227
-  sha256: c1bf5035d74e1acd62684ca438b685539cce45fc15c7d8f84563c7a47e54af23
+  version: 0.1.dev14+g902ce9fa4
+  sha256: 8444916540a9bf25ffca4e9cbc68786eec25145f64b6bc82af2547fcd7ff4fea
   requires_dist:
   - platformdirs>=3.0
   - tomlkit>=0.13
