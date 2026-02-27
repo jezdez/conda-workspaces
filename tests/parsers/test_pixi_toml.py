@@ -76,7 +76,7 @@ def test_parse_with_targets(tmp_path):
 [workspace]
 name = "target-test"
 channels = ["conda-forge"]
-platforms = ["linux-64", "osx-arm64"]
+platforms = ["linux-64", "osx-arm64", "win-64"]
 
 [dependencies]
 python = ">=3.10"

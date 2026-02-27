@@ -17,7 +17,7 @@ def pixi_workspace(tmp_path: Path) -> Path:
 [workspace]
 name = "cli-test"
 channels = ["conda-forge"]
-platforms = ["linux-64", "osx-arm64"]
+platforms = ["linux-64", "osx-arm64", "win-64"]
 
 [dependencies]
 python = ">=3.10"

@@ -22,7 +22,7 @@ def config(tmp_path: Path) -> WorkspaceConfig:
         name="ctx-test",
         root=str(tmp_path),
         channels=[Channel("conda-forge")],
-        platforms=["linux-64", "osx-arm64"],
+        platforms=["linux-64", "osx-arm64", "win-64"],
         features={"default": Feature(name="default")},
         environments={"default": Environment(name="default")},
     )

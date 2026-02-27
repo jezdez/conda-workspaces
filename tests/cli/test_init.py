@@ -18,7 +18,7 @@ _INIT_DEFAULTS = {
     "manifest_format": "pixi",
     "name": None,
     "channels": None,
-    "platforms": ["linux-64", "osx-arm64"],
+    "platforms": ["linux-64", "osx-arm64", "win-64"],
 }
 
 

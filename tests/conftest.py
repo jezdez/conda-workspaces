@@ -26,7 +26,7 @@ def sample_pixi_toml(tmp_path: Path) -> Path:
 name = "test-project"
 version = "0.1.0"
 channels = ["conda-forge"]
-platforms = ["linux-64", "osx-arm64"]
+platforms = ["linux-64", "osx-arm64", "win-64"]
 
 [dependencies]
 python = ">=3.10"
@@ -102,7 +102,7 @@ def sample_config() -> WorkspaceConfig:
         name="test-project",
         version="0.1.0",
         channels=[Channel("conda-forge")],
-        platforms=["linux-64", "osx-arm64"],
+        platforms=["linux-64", "osx-arm64", "win-64"],
         features={
             "default": default_feat,
             "test": test_feat,

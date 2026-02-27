@@ -38,10 +38,10 @@ def test_resolve_not_found(sample_config):
     [
         ("linux-64", False),
         ("osx-arm64", False),
-        ("win-64", True),
+        ("win-64", False),
         ("linux-aarch64", True),
     ],
-    ids=["linux-valid", "osx-valid", "win-invalid", "aarch64-invalid"],
+    ids=["linux-valid", "osx-valid", "win-valid", "aarch64-invalid"],
 )
 def test_resolve_platform_validation(sample_config, platform, should_raise):
     if should_raise:
