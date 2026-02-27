@@ -31,6 +31,17 @@ myst_enable_extensions = [
 
 html_theme = "conda_sphinx_theme"
 
+html_theme_options = {
+    "icon_links": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/conda-incubator/conda-workspaces",
+            "icon": "fa-brands fa-square-github",
+            "type": "fontawesome",
+        },
+    ],
+}
+
 html_context = {
     "github_user": "conda-incubator",
     "github_repo": "conda-workspaces",
