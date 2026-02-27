@@ -1,0 +1,340 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schemas.conda.org/conda-toml-1.schema.json",
+  "title": "conda.toml",
+  "description": "Schema for conda.toml workspace manifests used by conda-workspaces.",
+  "type": "object",
+  "required": ["workspace"],
+  "properties": {
+    "workspace": {
+      "$ref": "#/$defs/workspace"
+    },
+    "dependencies": {
+      "$ref": "#/$defs/condaDependencies",
+      "description": "Top-level (default feature) conda dependencies."
+    },
+    "pypi-dependencies": {
+      "$ref": "#/$defs/pypiDependencies",
+      "description": "Top-level (default feature) PyPI dependencies."
+    },
+    "activation": {
+      "$ref": "#/$defs/activation",
+      "description": "Top-level (default feature) activation settings."
+    },
+    "system-requirements": {
+      "$ref": "#/$defs/systemRequirements",
+      "description": "Top-level (default feature) system requirements."
+    },
+    "target": {
+      "$ref": "#/$defs/targets",
+      "description": "Top-level (default feature) per-platform dependency overrides."
+    },
+    "feature": {
+      "type": "object",
+      "description": "Named features that group dependencies and settings.",
+      "additionalProperties": {
+        "$ref": "#/$defs/feature"
+      }
+    },
+    "environments": {
+      "type": "object",
+      "description": "Named environments composed from one or more features.",
+      "additionalProperties": {
+        "$ref": "#/$defs/environment"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "platform": {
+      "type": "string",
+      "description": "A conda platform subdir.",
+      "enum": [
+        "emscripten-wasm32",
+        "freebsd-64",
+        "linux-32",
+        "linux-64",
+        "linux-aarch64",
+        "linux-armv6l",
+        "linux-armv7l",
+        "linux-ppc64",
+        "linux-ppc64le",
+        "linux-riscv64",
+        "linux-s390x",
+        "noarch",
+        "osx-64",
+        "osx-arm64",
+        "wasi-wasm32",
+        "win-32",
+        "win-64",
+        "win-arm64",
+        "zos-z"
+      ]
+    },
+    "workspace": {
+      "type": "object",
+      "description": "Workspace metadata.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Workspace name."
+        },
+        "version": {
+          "type": "string",
+          "description": "Workspace version."
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description of the workspace."
+        },
+        "channels": {
+          "type": "array",
+          "description": "Conda channels in priority order.",
+          "items": {
+            "$ref": "#/$defs/channel"
+          }
+        },
+        "platforms": {
+          "type": "array",
+          "description": "Supported platforms.",
+          "items": {
+            "$ref": "#/$defs/platform"
+          },
+          "uniqueItems": true
+        },
+        "channel-priority": {
+          "type": "string",
+          "description": "Channel priority mode for the solver.",
+          "enum": ["strict", "flexible", "disabled"]
+        }
+      },
+      "required": ["channels", "platforms"],
+      "additionalProperties": false
+    },
+    "channel": {
+      "description": "A conda channel, specified as a name/URL string or a dict with a 'channel' key.",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Channel name or URL (e.g. 'conda-forge', 'https://my.channel/label/dev')."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string",
+              "description": "Channel name or URL."
+            }
+          },
+          "required": ["channel"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "condaDependencySpec": {
+      "description": "A conda dependency specification.",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Version constraint string (e.g. '>=3.10', '>=1.24,<2', '*')."
+        },
+        {
+          "type": "object",
+          "description": "Detailed dependency specification with version and optional build string.",
+          "properties": {
+            "version": {
+              "type": "string",
+              "description": "Version constraint (e.g. '>=12')."
+            },
+            "build": {
+              "type": "string",
+              "description": "Build string glob pattern (e.g. '*cuda*')."
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "condaDependencies": {
+      "type": "object",
+      "description": "Conda package dependencies keyed by package name.",
+      "additionalProperties": {
+        "$ref": "#/$defs/condaDependencySpec"
+      }
+    },
+    "pypiDependencySpec": {
+      "description": "A PyPI dependency specification.",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "PEP 508 version constraint string (e.g. '>=2.28')."
+        },
+        {
+          "type": "object",
+          "description": "Detailed PyPI dependency specification.",
+          "properties": {
+            "version": {
+              "type": "string",
+              "description": "Version constraint (e.g. '>=2.28')."
+            },
+            "path": {
+              "type": "string",
+              "description": "Local path to the package."
+            },
+            "editable": {
+              "type": "boolean",
+              "description": "Install in editable (development) mode."
+            },
+            "git": {
+              "type": "string",
+              "description": "Git repository URL."
+            },
+            "branch": {
+              "type": "string",
+              "description": "Git branch to use."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Git tag to use."
+            },
+            "rev": {
+              "type": "string",
+              "description": "Git revision to use."
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "pypiDependencies": {
+      "type": "object",
+      "description": "PyPI package dependencies keyed by package name.",
+      "additionalProperties": {
+        "$ref": "#/$defs/pypiDependencySpec"
+      }
+    },
+    "activation": {
+      "type": "object",
+      "description": "Environment activation settings.",
+      "properties": {
+        "scripts": {
+          "type": "array",
+          "description": "Shell scripts to source on environment activation.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "env": {
+          "type": "object",
+          "description": "Environment variables set on activation.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "systemRequirements": {
+      "type": "object",
+      "description": "System-level requirements (e.g. minimum glibc or macOS version).",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "targets": {
+      "type": "object",
+      "description": "Per-platform dependency overrides keyed by platform name.",
+      "propertyNames": {
+        "$ref": "#/$defs/platform"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/targetOverride"
+      }
+    },
+    "targetOverride": {
+      "type": "object",
+      "description": "Platform-specific dependency overrides.",
+      "properties": {
+        "dependencies": {
+          "$ref": "#/$defs/condaDependencies"
+        },
+        "pypi-dependencies": {
+          "$ref": "#/$defs/pypiDependencies"
+        }
+      },
+      "additionalProperties": false
+    },
+    "feature": {
+      "type": "object",
+      "description": "A named feature that groups dependencies and settings.",
+      "properties": {
+        "dependencies": {
+          "$ref": "#/$defs/condaDependencies"
+        },
+        "pypi-dependencies": {
+          "$ref": "#/$defs/pypiDependencies"
+        },
+        "channels": {
+          "type": "array",
+          "description": "Additional channels for this feature.",
+          "items": {
+            "$ref": "#/$defs/channel"
+          }
+        },
+        "platforms": {
+          "type": "array",
+          "description": "Platform restrictions for this feature.",
+          "items": {
+            "$ref": "#/$defs/platform"
+          },
+          "uniqueItems": true
+        },
+        "system-requirements": {
+          "$ref": "#/$defs/systemRequirements"
+        },
+        "activation": {
+          "$ref": "#/$defs/activation"
+        },
+        "target": {
+          "$ref": "#/$defs/targets"
+        }
+      },
+      "additionalProperties": false
+    },
+    "environment": {
+      "description": "A named environment composed from features.",
+      "oneOf": [
+        {
+          "type": "array",
+          "description": "Shorthand: list of feature names to include.",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "object",
+          "description": "Full environment definition.",
+          "properties": {
+            "features": {
+              "type": "array",
+              "description": "Feature names to include (in addition to the default feature).",
+              "items": {
+                "type": "string"
+              }
+            },
+            "solve-group": {
+              "type": "string",
+              "description": "Solve-group for version coordination across environments."
+            },
+            "no-default-feature": {
+              "type": "boolean",
+              "description": "Exclude the default feature from this environment.",
+              "default": false
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://conda-incubator.github.io/conda-workspaces/sitemap.xml
