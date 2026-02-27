@@ -23,12 +23,22 @@ def _make_args(**kwargs) -> argparse.Namespace:
     return argparse.Namespace(**{**_SHELL_DEFAULTS, **kwargs})
 
 
-def test_shell_spawns_default(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    "env_name, expected_path_part",
+    [
+        ("default", "default"),
+        ("test", "test"),
+    ],
+    ids=["default-env", "named-env"],
+)
+def test_shell_spawns_env(
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env_name: str,
+    expected_path_part: str,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    # Fake-install the default env
-    meta = pixi_workspace / ".conda" / "envs" / "default" / "conda-meta"
+    meta = pixi_workspace / ".conda" / "envs" / env_name / "conda-meta"
     meta.mkdir(parents=True)
     (meta / "history").write_text("", encoding="utf-8")
 
@@ -40,38 +50,29 @@ def test_shell_spawns_default(
 
     monkeypatch.setattr("conda_spawn.main.spawn", fake_spawn)
 
-    args = _make_args()
+    args = _make_args(env_name=env_name)
     result = execute_shell(args)
     assert result == 0
     assert len(spawn_calls) == 1
-    assert "default" in str(spawn_calls[0]["prefix"])
+    assert expected_path_part in str(spawn_calls[0]["prefix"])
     assert spawn_calls[0]["command"] is None
 
 
-def test_shell_spawns_named_env(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.chdir(pixi_workspace)
-    meta = pixi_workspace / ".conda" / "envs" / "test" / "conda-meta"
-    meta.mkdir(parents=True)
-    (meta / "history").write_text("", encoding="utf-8")
-
-    spawn_calls: list[dict] = []
-
-    def fake_spawn(*, prefix, command=None):
-        spawn_calls.append({"prefix": prefix, "command": command})
-        return 0
-
-    monkeypatch.setattr("conda_spawn.main.spawn", fake_spawn)
-
-    args = _make_args(env_name="test")
-    result = execute_shell(args)
-    assert result == 0
-    assert "test" in str(spawn_calls[0]["prefix"])
-
-
-def test_shell_with_command(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    "cmd_input, expected_command",
+    [
+        (["--", "python", "-c", "print(1)"], ["python", "-c", "print(1)"]),
+        (["python"], ["python"]),
+        (["--", "echo", "hello"], ["echo", "hello"]),
+        ([], None),
+    ],
+    ids=["strips-dashdash", "no-dashdash", "dashdash-multi-arg", "empty-cmd"],
+)
+def test_shell_command_passthrough(
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cmd_input: list[str],
+    expected_command: list[str] | None,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
     meta = pixi_workspace / ".conda" / "envs" / "default" / "conda-meta"
@@ -86,33 +87,10 @@ def test_shell_with_command(
 
     monkeypatch.setattr("conda_spawn.main.spawn", fake_spawn)
 
-    args = _make_args(cmd=["--", "python", "-c", "print(1)"])
+    args = _make_args(cmd=cmd_input)
     result = execute_shell(args)
     assert result == 0
-    assert spawn_calls[0]["command"] == ["python", "-c", "print(1)"]
-
-
-def test_shell_strips_leading_dashdash(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.chdir(pixi_workspace)
-    meta = pixi_workspace / ".conda" / "envs" / "default" / "conda-meta"
-    meta.mkdir(parents=True)
-    (meta / "history").write_text("", encoding="utf-8")
-
-    spawn_calls: list[dict] = []
-
-    def fake_spawn(*, prefix, command=None):
-        spawn_calls.append({"prefix": prefix, "command": command})
-        return 0
-
-    monkeypatch.setattr("conda_spawn.main.spawn", fake_spawn)
-
-    # No leading --, just the command
-    args = _make_args(cmd=["python"])
-    result = execute_shell(args)
-    assert result == 0
-    assert spawn_calls[0]["command"] == ["python"]
+    assert spawn_calls[0]["command"] == expected_command
 
 
 @pytest.mark.parametrize(
