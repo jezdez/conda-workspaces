@@ -85,6 +85,7 @@ standalone shortcut.
 | `cw add SPECS...` | Add dependencies |
 | `cw remove SPECS...` | Remove dependencies |
 | `cw run -e ENV -- CMD` | Run a command in an environment |
+| `cw shell [ENV]` | Spawn a shell with an environment activated |
 | `cw activate [ENV]` | Print activation instructions |
 | `cw clean` | Remove installed environments |
 

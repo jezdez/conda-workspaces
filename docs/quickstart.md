@@ -134,6 +134,22 @@ identical environments across machines and CI.
 cw run -e test -- pytest -v
 ```
 
+## Spawn a shell
+
+To drop into an interactive shell with an environment activated, use
+`cw shell`. This relies on [conda-spawn](https://conda-incubator.github.io/conda-spawn/)
+to start a new shell process — exit with `exit` or Ctrl+D to return.
+
+```bash
+cw shell test
+```
+
+You can also pass a command to run inside the spawned shell:
+
+```bash
+cw shell test -- python -c "import numpy; print(numpy.__version__)"
+```
+
 ## List environments
 
 ```bash

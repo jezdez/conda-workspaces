@@ -244,6 +244,24 @@ def configure_parser(parser: argparse.ArgumentParser) -> None:
         help="Environment name (default: default).",
     )
 
+    shell_parser = sub.add_parser(
+        "shell",
+        help="Spawn a new shell with an environment activated.",
+        add_help=False,
+    )
+    add_parser_help(shell_parser)
+    shell_parser.add_argument(
+        "env_name",
+        nargs="?",
+        default="default",
+        help="Environment name (default: default).",
+    )
+    shell_parser.add_argument(
+        "cmd",
+        nargs=argparse.REMAINDER,
+        help="Optional command to run in the spawned shell.",
+    )
+
 
 def execute(args: argparse.Namespace) -> int:
     """Main entry point dispatched by the conda plugin system."""
@@ -293,6 +311,10 @@ def execute(args: argparse.Namespace) -> int:
         from .activate import execute_activate
 
         return execute_activate(args)
+    elif subcmd == "shell":
+        from .shell import execute_shell
+
+        return execute_shell(args)
     else:
         generate_parser().print_help()
         return 0
