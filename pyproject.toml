@@ -102,6 +102,9 @@ conda = ">=24.7"
 conda-lockfiles = ">=0.1"
 conda-spawn = ">=0.0.5"
 
+[tool.pixi.pypi-dependencies]
+conda-workspaces = { path = ".", editable = true }
+
 [tool.pixi.feature.dev.dependencies]
 ruff = ">=0.9"
 ty = ">=0.0.1a7"
