@@ -80,7 +80,7 @@ select = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra -q"
+addopts = "-ra -v"
 
 [tool.ty.environment]
 python-version = "3.10"
