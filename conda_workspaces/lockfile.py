@@ -49,11 +49,6 @@ LOCKFILE_VERSION = 1
 LOCKFILE_NAME = "conda.lock"
 
 
-# ---------------------------------------------------------------------------
-# Path helpers
-# ---------------------------------------------------------------------------
-
-
 def lockfile_path(ctx: WorkspaceContext) -> Path:
     """Return the path to the workspace lockfile (``<root>/conda.lock``)."""
     return ctx.root / LOCKFILE_NAME
@@ -62,11 +57,6 @@ def lockfile_path(ctx: WorkspaceContext) -> Path:
 def lockfile_exists(ctx: WorkspaceContext) -> bool:
     """Check whether a lockfile exists for the workspace."""
     return lockfile_path(ctx).is_file()
-
-
-# ---------------------------------------------------------------------------
-# Generating the lockfile
-# ---------------------------------------------------------------------------
 
 
 def _build_lockfile_dict(
@@ -150,11 +140,6 @@ def generate_lockfile(
     return path
 
 
-# ---------------------------------------------------------------------------
-# Reading the lockfile
-# ---------------------------------------------------------------------------
-
-
 def _read_lockfile_data(ctx: WorkspaceContext) -> dict[str, Any]:
     """Parse ``conda.lock`` and return the raw dict."""
     path = lockfile_path(ctx)
@@ -205,11 +190,6 @@ def _extract_env_packages(
         result.append((url, metadata))
 
     return result
-
-
-# ---------------------------------------------------------------------------
-# Installing from the lockfile
-# ---------------------------------------------------------------------------
 
 
 def install_from_lockfile(ctx: WorkspaceContext, env_name: str) -> None:

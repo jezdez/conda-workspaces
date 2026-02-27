@@ -48,10 +48,6 @@ cw = "conda_workspaces.__main__:main"
 [project.entry-points.conda]
 "conda-workspaces" = "conda_workspaces.plugin"
 
-# ---------------------------------------------------------------------------
-# Tool configuration
-# ---------------------------------------------------------------------------
-
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]
 omit = ["conda_workspaces/_version.py"]
@@ -88,10 +84,6 @@ addopts = "-ra -q"
 
 [tool.ty.environment]
 python-version = "3.10"
-
-# ---------------------------------------------------------------------------
-# pixi workspace (used for development)
-# ---------------------------------------------------------------------------
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
