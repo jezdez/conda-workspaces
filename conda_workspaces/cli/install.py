@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-import argparse
+from typing import TYPE_CHECKING
 
 from ..context import WorkspaceContext
 from ..envs import install_environment
 from ..lockfile import generate_lockfile, install_from_lockfile
 from ..parsers import detect_and_parse
 from ..resolver import resolve_all_environments, resolve_environment
+
+if TYPE_CHECKING:
+    import argparse
 
 
 def execute_install(args: argparse.Namespace) -> int:

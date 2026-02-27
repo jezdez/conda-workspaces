@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
-
 from conda.exceptions import ArgumentError
 
 from conda_workspaces.cli.run import execute_run
 from conda_workspaces.exceptions import EnvironmentNotInstalledError
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _RUN_DEFAULTS = {"file": None, "environment": "default", "cmd": []}
 
@@ -50,15 +52,15 @@ def _stub_run_deps(
 
     monkeypatch.setattr("conda_workspaces.cli.run.wrap_subprocess_call", fake_wrap)
 
-    def fake_subprocess_call(command, *, env=None, path=None, raise_on_error=False, capture_output=False):
+    def fake_subprocess_call(
+        command, *, env=None, path=None, raise_on_error=False, capture_output=False
+    ):
         return FakeResponse(rc=rc)
 
     monkeypatch.setattr(
         "conda_workspaces.cli.run.subprocess_call", fake_subprocess_call
     )
-    monkeypatch.setattr(
-        "conda_workspaces.cli.run.encode_environment", lambda env: env
-    )
+    monkeypatch.setattr("conda_workspaces.cli.run.encode_environment", lambda env: env)
     monkeypatch.setattr("conda_workspaces.cli.run.rm_rf", lambda path: None)
 
 
@@ -71,7 +73,11 @@ def _stub_run_deps(
     ids=["no-command", "not-installed"],
 )
 def test_run_error(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch, cmd: list[str], exc_type: type, match: str
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cmd: list[str],
+    exc_type: type,
+    match: str,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
     args = _make_args(cmd=cmd)

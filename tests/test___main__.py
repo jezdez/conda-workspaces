@@ -52,7 +52,6 @@ def test_main_exits_with_execute_return_code(
     monkeypatch: pytest.MonkeyPatch, exit_code: int, tmp_path
 ) -> None:
     """main() should SystemExit with whatever execute() returns."""
-    called_with: list = []
 
     class FakeParser:
         prog: str = ""
@@ -69,9 +68,7 @@ def test_main_exits_with_execute_return_code(
     from conda_workspaces.cli import main as cli_main_mod
 
     monkeypatch.setattr(cli_main_mod, "generate_parser", lambda: fake_parser)
-    monkeypatch.setattr(
-        cli_main_mod, "execute", lambda parsed: exit_code
-    )
+    monkeypatch.setattr(cli_main_mod, "execute", lambda parsed: exit_code)
 
     with pytest.raises(SystemExit) as exc_info:
         main([])

@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import argparse
 import os
-import sys
+from typing import TYPE_CHECKING
 
 from conda.base.context import context as conda_context
 from conda.common.compat import encode_environment
@@ -16,6 +15,9 @@ from conda.utils import wrap_subprocess_call
 from ..context import WorkspaceContext
 from ..exceptions import EnvironmentNotInstalledError
 from ..parsers import detect_and_parse
+
+if TYPE_CHECKING:
+    import argparse
 
 
 def execute_run(args: argparse.Namespace) -> int:

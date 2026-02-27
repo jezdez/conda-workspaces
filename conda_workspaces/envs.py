@@ -7,7 +7,6 @@ a standard conda prefix that can be activated with ``conda activate``.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from conda.base.constants import UpdateModifier
@@ -21,6 +20,7 @@ from .exceptions import SolveError
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from pathlib import Path
 
     from .context import WorkspaceContext
     from .resolver import ResolvedEnvironment
@@ -126,7 +126,9 @@ def _install_pypi_deps(prefix: Path, resolved: ResolvedEnvironment) -> None:
     try:
         from conda_pypi.convert_tree import ConvertTree  # type: ignore[import-untyped]
         from conda_pypi.main import run_conda_install  # type: ignore[import-untyped]
-        from conda_pypi.translate import pypi_to_conda_name  # type: ignore[import-untyped]
+        from conda_pypi.translate import (
+            pypi_to_conda_name,  # type: ignore[import-untyped]
+        )
     except ImportError:
         log.warning(
             "PyPI dependencies found but conda-pypi is not installed.\n"
@@ -160,8 +162,7 @@ def _install_pypi_deps(prefix: Path, resolved: ResolvedEnvironment) -> None:
         )
     except Exception as exc:
         log.warning(
-            "Failed to install PyPI dependencies via conda-pypi: %s\n"
-            "  Skipped: %s",
+            "Failed to install PyPI dependencies via conda-pypi: %s\n  Skipped: %s",
             exc,
             ", ".join(pypi_specs),
         )

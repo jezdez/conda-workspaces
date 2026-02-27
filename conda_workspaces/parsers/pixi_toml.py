@@ -7,7 +7,7 @@ Reads ``[workspace]`` (or ``[project]`` for legacy manifests),
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import tomlkit
 
@@ -25,6 +25,9 @@ from .toml import (
     _parse_pypi_deps,
     _parse_target_overrides,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class PixiTomlParser(WorkspaceParser):
@@ -57,9 +60,7 @@ class PixiTomlParser(WorkspaceParser):
         # workspace table (pixi v0.23+) or legacy project table
         ws = data.get("workspace", data.get("project", {}))
         if not ws:
-            raise WorkspaceParseError(
-                path, "No [workspace] or [project] table found"
-            )
+            raise WorkspaceParseError(path, "No [workspace] or [project] table found")
 
         config = WorkspaceConfig(
             name=ws.get("name"),
@@ -83,17 +84,13 @@ class PixiTomlParser(WorkspaceParser):
         # Top-level activation
         activation = data.get("activation", {})
         if activation:
-            default_feature.activation_scripts = list(
-                activation.get("scripts", [])
-            )
+            default_feature.activation_scripts = list(activation.get("scripts", []))
             default_feature.activation_env = dict(activation.get("env", {}))
 
         # Top-level system-requirements
         sysreq = data.get("system-requirements", {})
         if sysreq:
-            default_feature.system_requirements = {
-                k: str(v) for k, v in sysreq.items()
-            }
+            default_feature.system_requirements = {k: str(v) for k, v in sysreq.items()}
 
         # Top-level target overrides
         _parse_target_overrides(data.get("target", {}), default_feature)
@@ -113,15 +110,11 @@ class PixiTomlParser(WorkspaceParser):
 
             sysreq = feat_data.get("system-requirements", {})
             if sysreq:
-                feature.system_requirements = {
-                    k: str(v) for k, v in sysreq.items()
-                }
+                feature.system_requirements = {k: str(v) for k, v in sysreq.items()}
 
             activation = feat_data.get("activation", {})
             if activation:
-                feature.activation_scripts = list(
-                    activation.get("scripts", [])
-                )
+                feature.activation_scripts = list(activation.get("scripts", []))
                 feature.activation_env = dict(activation.get("env", {}))
 
             _parse_target_overrides(feat_data.get("target", {}), feature)

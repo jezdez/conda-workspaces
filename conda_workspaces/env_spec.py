@@ -76,9 +76,7 @@ class CondaWorkspaceSpec(EnvironmentSpecBase):
         resolved = resolve_environment(config, "default", context.subdir)
 
         env_config = EnvironmentConfig(
-            channels=tuple(
-                ch.canonical_name for ch in resolved.channels
-            ),
+            channels=tuple(ch.canonical_name for ch in resolved.channels),
         )
 
         requested: list[MatchSpec] = list(resolved.conda_dependencies.values())
@@ -167,9 +165,7 @@ class CondaLockSpec(EnvironmentSpecBase):
         # Build channel config from the lockfile
         channels = env_data.get("channels", [])
         env_config = EnvironmentConfig(
-            channels=tuple(
-                Channel(ch["url"]).canonical_name for ch in channels
-            ),
+            channels=tuple(Channel(ch["url"]).canonical_name for ch in channels),
         )
 
         # Build package lookup from the top-level packages list

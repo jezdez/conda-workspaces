@@ -10,7 +10,6 @@ tables in order:
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import tomlkit
@@ -31,6 +30,7 @@ from .toml import (
 )
 
 if TYPE_CHECKING:
+    from pathlib import Path
     from typing import Any
 
 
@@ -62,9 +62,7 @@ class PyprojectTomlParser(WorkspaceParser):
         cw = tool.get("conda-workspaces", {})
         pixi = tool.get("pixi", {})
         return bool(
-            conda.get("workspace")
-            or cw.get("workspace")
-            or pixi.get("workspace")
+            conda.get("workspace") or cw.get("workspace") or pixi.get("workspace")
         )
 
     def parse(self, path: Path) -> WorkspaceConfig:
@@ -119,16 +117,12 @@ class PyprojectTomlParser(WorkspaceParser):
 
         activation = source.get("activation", {})
         if activation:
-            default_feature.activation_scripts = list(
-                activation.get("scripts", [])
-            )
+            default_feature.activation_scripts = list(activation.get("scripts", []))
             default_feature.activation_env = dict(activation.get("env", {}))
 
         sysreq = source.get("system-requirements", {})
         if sysreq:
-            default_feature.system_requirements = {
-                k: str(v) for k, v in sysreq.items()
-            }
+            default_feature.system_requirements = {k: str(v) for k, v in sysreq.items()}
 
         _parse_target_overrides(source.get("target", {}), default_feature)
         config.features[Feature.DEFAULT_NAME] = default_feature
@@ -146,15 +140,11 @@ class PyprojectTomlParser(WorkspaceParser):
 
             sysreq = feat_data.get("system-requirements", {})
             if sysreq:
-                feature.system_requirements = {
-                    k: str(v) for k, v in sysreq.items()
-                }
+                feature.system_requirements = {k: str(v) for k, v in sysreq.items()}
 
             activation = feat_data.get("activation", {})
             if activation:
-                feature.activation_scripts = list(
-                    activation.get("scripts", [])
-                )
+                feature.activation_scripts = list(activation.get("scripts", []))
                 feature.activation_env = dict(activation.get("env", {}))
 
             _parse_target_overrides(feat_data.get("target", {}), feature)

@@ -48,9 +48,7 @@ def workspace(tmp_path: Path) -> WorkspaceContext:
     return WorkspaceContext(config)
 
 
-def _make_fake_env(
-    ctx: WorkspaceContext, name: str, pkg_count: int = 0
-) -> Path:
+def _make_fake_env(ctx: WorkspaceContext, name: str, pkg_count: int = 0) -> Path:
     """Create a fake installed environment with optional package jsons."""
     prefix = ctx.env_prefix(name)
     meta = prefix / "conda-meta"
@@ -200,6 +198,7 @@ def _stub_conda_imports(monkeypatch: pytest.MonkeyPatch, solver: FakeSolver) -> 
                 solver.subdirs = subdirs
                 solver.specs_to_add = list(specs_to_add)
                 return solver
+
             return factory
 
     class FakeContext:
@@ -317,6 +316,7 @@ def test_install_existing_env_uses_freeze(
     install_environment(workspace, resolved)
 
     from conda.base.constants import UpdateModifier
+
     assert recorded_kwargs.get("update_modifier") is UpdateModifier.FREEZE_INSTALLED
 
 

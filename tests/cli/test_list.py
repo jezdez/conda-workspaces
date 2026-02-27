@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
-
-import pytest
+from typing import TYPE_CHECKING
 
 from conda_workspaces.cli.list import execute_list
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
 
 _LIST_DEFAULTS = {"file": None, "installed": False, "json": False}
 
@@ -18,7 +21,9 @@ def _make_args(**kwargs) -> argparse.Namespace:
 
 
 def test_list_all_environments(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
     args = _make_args()
@@ -30,7 +35,9 @@ def test_list_all_environments(
 
 
 def test_list_installed_only(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
     # No environments installed yet
@@ -42,7 +49,9 @@ def test_list_installed_only(
 
 
 def test_list_installed_with_env(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
     # Fake-install the default env
@@ -59,7 +68,9 @@ def test_list_installed_with_env(
 
 
 def test_list_json_output(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
     args = _make_args(json=True)

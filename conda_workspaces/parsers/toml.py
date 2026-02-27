@@ -8,7 +8,6 @@ environments, and target overrides are shared with
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import tomlkit
@@ -17,15 +16,19 @@ from ..exceptions import WorkspaceParseError
 from ..models import (
     Channel,
     Environment,
-    Feature,
     MatchSpec,
     PyPIDependency,
-    WorkspaceConfig,
 )
 from .base import WorkspaceParser
 
 if TYPE_CHECKING:
+    from pathlib import Path
     from typing import Any
+
+    from ..models import (
+        Feature,
+        WorkspaceConfig,
+    )
 
 
 class CondaTomlParser(WorkspaceParser):
@@ -130,9 +133,7 @@ def _parse_environment(name: str, raw: Any) -> Environment:
     return Environment(name=name)
 
 
-def _parse_target_overrides(
-    target_data: dict[str, Any], feature: Feature
-) -> None:
+def _parse_target_overrides(target_data: dict[str, Any], feature: Feature) -> None:
     """Parse ``[target.<platform>]`` dep overrides into a feature."""
     for platform, tdata in target_data.items():
         conda = _parse_conda_deps(tdata.get("dependencies", {}))

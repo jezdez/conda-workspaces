@@ -53,9 +53,7 @@ def _envs_to_dict(envs: Iterable[Environment]) -> dict[str, Any]:
 
         if env_name not in environments:
             environments[env_name] = {
-                "channels": [
-                    {"url": ch} for ch in env.config.channels
-                ],
+                "channels": [{"url": ch} for ch in env.config.channels],
                 "packages": {},
             }
 

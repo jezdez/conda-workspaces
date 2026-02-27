@@ -16,9 +16,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ..exceptions import WorkspaceNotFoundError, WorkspaceParseError
-from .toml import CondaTomlParser
 from .pixi_toml import PixiTomlParser
 from .pyproject_toml import PyprojectTomlParser
+from .toml import CondaTomlParser
 
 if TYPE_CHECKING:
     from ..models import WorkspaceConfig
@@ -58,9 +58,7 @@ def detect_workspace_file(
             candidate = current / fname
             if candidate.is_file():
                 for parser in _PARSERS:
-                    if parser.can_handle(candidate) and parser.has_workspace(
-                        candidate
-                    ):
+                    if parser.can_handle(candidate) and parser.has_workspace(candidate):
                         return candidate
         parent = current.parent
         if parent == current:

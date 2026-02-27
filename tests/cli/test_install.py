@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from conda_workspaces.cli.install import execute_install
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _INSTALL_DEFAULTS = {
     "file": None,

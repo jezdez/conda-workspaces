@@ -48,9 +48,7 @@ def test_resolve_platform_validation(sample_config, platform, should_raise):
         with pytest.raises(PlatformError):
             resolve_environment(sample_config, "default", platform=platform)
     else:
-        resolved = resolve_environment(
-            sample_config, "default", platform=platform
-        )
+        resolved = resolve_environment(sample_config, "default", platform=platform)
         assert resolved.name == "default"
 
 

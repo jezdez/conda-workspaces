@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from conda_workspaces.cli.clean import execute_clean
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _CLEAN_DEFAULTS = {"file": None, "environment": None}
 
@@ -30,7 +33,9 @@ def _stub_confirm_and_unregister(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_clean_single_environment(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
     _stub_confirm_and_unregister(monkeypatch)
@@ -45,7 +50,9 @@ def test_clean_single_environment(
 
 
 def test_clean_all_environments(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
     _stub_confirm_and_unregister(monkeypatch)

@@ -43,16 +43,14 @@ def test_detect_not_found(tmp_path):
 
 def test_conda_toml_priority_over_pixi(tmp_path):
     """conda.toml should be preferred when both exist."""
+    toml = (
+        '[workspace]\nname = "{name}"\nchannels'
+        ' = ["conda-forge"]\nplatforms = ["linux-64"]\n'
+    )
     conda = tmp_path / "conda.toml"
-    conda.write_text(
-        '[workspace]\nname = "conda"\nchannels = ["conda-forge"]\nplatforms = ["linux-64"]\n',
-        encoding="utf-8",
-    )
+    conda.write_text(toml.format(name="conda"), encoding="utf-8")
     pixi = tmp_path / "pixi.toml"
-    pixi.write_text(
-        '[workspace]\nname = "pixi"\nchannels = ["conda-forge"]\nplatforms = ["linux-64"]\n',
-        encoding="utf-8",
-    )
+    pixi.write_text(toml.format(name="pixi"), encoding="utf-8")
     path = detect_workspace_file(tmp_path)
     assert path.name == "conda.toml"
 
@@ -61,7 +59,8 @@ def test_pixi_toml_priority_over_pyproject(tmp_path):
     """pixi.toml should be preferred over pyproject.toml."""
     pixi = tmp_path / "pixi.toml"
     pixi.write_text(
-        '[workspace]\nname = "pixi"\nchannels = ["conda-forge"]\nplatforms = ["linux-64"]\n',
+        '[workspace]\nname = "pixi"\nchannels'
+        ' = ["conda-forge"]\nplatforms = ["linux-64"]\n',
         encoding="utf-8",
     )
     pyproject = tmp_path / "pyproject.toml"
@@ -76,7 +75,8 @@ def test_pixi_toml_priority_over_pyproject(tmp_path):
 def test_conda_toml(tmp_path):
     path = tmp_path / "conda.toml"
     path.write_text(
-        '[workspace]\nname = "cw"\nchannels = ["conda-forge"]\nplatforms = ["linux-64"]\n',
+        '[workspace]\nname = "cw"\nchannels'
+        ' = ["conda-forge"]\nplatforms = ["linux-64"]\n',
         encoding="utf-8",
     )
     detected = detect_workspace_file(tmp_path)

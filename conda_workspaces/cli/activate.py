@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-import argparse
+from typing import TYPE_CHECKING
 
-from ..context import WorkspaceContext
 from conda.cli.common import print_activate
 
+from ..context import WorkspaceContext
 from ..exceptions import EnvironmentNotFoundError, EnvironmentNotInstalledError
 from ..parsers import detect_and_parse
+
+if TYPE_CHECKING:
+    import argparse
 
 
 def execute_activate(args: argparse.Namespace) -> int:

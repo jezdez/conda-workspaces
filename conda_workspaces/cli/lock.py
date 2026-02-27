@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-import argparse
+from typing import TYPE_CHECKING
 
 from ..context import WorkspaceContext
 from ..lockfile import generate_lockfile, lockfile_path
 from ..parsers import detect_and_parse
 from ..resolver import resolve_all_environments
+
+if TYPE_CHECKING:
+    import argparse
 
 
 def execute_lock(args: argparse.Namespace) -> int:
@@ -27,12 +30,8 @@ def execute_lock(args: argparse.Namespace) -> int:
         print(f"Lockfile written to {path}")
     else:
         resolved_all = resolve_all_environments(config, ctx.platform)
-        installed = [
-            name for name in resolved_all if ctx.env_exists(name)
-        ]
-        skipped = [
-            name for name in resolved_all if not ctx.env_exists(name)
-        ]
+        installed = [name for name in resolved_all if ctx.env_exists(name)]
+        skipped = [name for name in resolved_all if not ctx.env_exists(name)]
         if installed:
             path = generate_lockfile(ctx, env_names=installed)
             for name in installed:

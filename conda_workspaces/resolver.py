@@ -11,8 +11,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from .exceptions import (
-    EnvironmentNotFoundError,
-    FeatureNotFoundError,
     PlatformError,
 )
 

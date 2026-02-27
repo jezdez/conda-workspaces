@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -13,6 +13,9 @@ from conda_workspaces.models import (
     MatchSpec,
     WorkspaceConfig,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @pytest.fixture
@@ -107,9 +110,7 @@ def sample_config() -> WorkspaceConfig:
         },
         environments={
             "default": Environment(name="default", solve_group="default"),
-            "test": Environment(
-                name="test", features=["test"], solve_group="default"
-            ),
+            "test": Environment(name="test", features=["test"], solve_group="default"),
             "docs": Environment(name="docs", features=["docs"]),
         },
         root="/tmp/test-project",

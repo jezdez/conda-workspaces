@@ -6,7 +6,7 @@ import argparse
 
 import pytest
 
-from conda_workspaces.cli.main import configure_parser, execute, generate_parser
+from conda_workspaces.cli.main import execute, generate_parser
 
 
 def test_generate_parser_returns_parser() -> None:
@@ -58,7 +58,11 @@ def test_unknown_subcmd_prints_help(capsys: pytest.CaptureFixture[str]) -> None:
         (["init", "--format", "conda"], "manifest_format", "conda"),
         (["init", "--format", "pyproject"], "manifest_format", "pyproject"),
         (["init", "--name", "myproj"], "name", "myproj"),
-        (["init", "-c", "defaults", "-c", "bioconda"], "channels", ["defaults", "bioconda"]),
+        (
+            ["init", "-c", "defaults", "-c", "bioconda"],
+            "channels",
+            ["defaults", "bioconda"],
+        ),
         (["install", "-e", "test"], "environment", "test"),
         (["install", "--force-reinstall"], "force_reinstall", True),
         (["list", "--installed"], "installed", True),

@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 import tomlkit
 
 from conda_workspaces.cli.add import execute_add
 from conda_workspaces.cli.remove import execute_remove
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _ADD_REMOVE_DEFAULTS = {
     "file": None,

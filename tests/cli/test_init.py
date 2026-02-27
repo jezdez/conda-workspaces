@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 import tomlkit
 
 from conda_workspaces.cli.init import execute_init
 from conda_workspaces.exceptions import ManifestExistsError
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _INIT_DEFAULTS = {
     "manifest_format": "pixi",
@@ -138,9 +141,7 @@ def test_init_default_name_from_dir(
     assert doc["workspace"]["name"] == tmp_path.name
 
 
-def test_init_default_channels(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_init_default_channels(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     args = _make_args(manifest_format="pixi", name="ch-test", channels=None)
     execute_init(args)

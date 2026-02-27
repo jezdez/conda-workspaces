@@ -43,7 +43,8 @@ def test_has_workspace(tmp_path, write_file, expected):
     path = tmp_path / "conda.toml"
     if write_file:
         path.write_text(
-            '[workspace]\nname = "my-workspace"\nchannels = ["conda-forge"]\nplatforms = ["linux-64"]\n',
+            '[workspace]\nname = "my-workspace"\nchannels'
+            ' = ["conda-forge"]\nplatforms = ["linux-64"]\n',
             encoding="utf-8",
         )
     parser = CondaTomlParser()

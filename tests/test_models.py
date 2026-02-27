@@ -164,9 +164,7 @@ def test_config_merged_channels(sample_config):
 
 
 def test_config_merged_channels_deduplication():
-    feat_a = Feature(
-        name="a", channels=[Channel("conda-forge")]
-    )
+    feat_a = Feature(name="a", channels=[Channel("conda-forge")])
     config = WorkspaceConfig(
         channels=[Channel("conda-forge")],
         features={"default": Feature(name="default"), "a": feat_a},

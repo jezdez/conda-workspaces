@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import argparse
+from typing import TYPE_CHECKING
 
 from conda.exceptions import CondaSystemExit, DryRunExit
 from conda.reporters import confirm_yn
@@ -10,6 +10,9 @@ from conda.reporters import confirm_yn
 from ..context import WorkspaceContext
 from ..envs import clean_all, list_installed_environments, remove_environment
 from ..parsers import detect_and_parse
+
+if TYPE_CHECKING:
+    import argparse
 
 
 def execute_clean(args: argparse.Namespace) -> int:

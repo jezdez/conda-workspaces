@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from conda_workspaces.cli.info import execute_info
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _INFO_DEFAULTS = {"file": None, "env_name": "default", "json": False}
 
@@ -42,7 +45,9 @@ def test_info_text_output(
 
 
 def test_info_installed_env(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
     # Fake-install the default env with 3 packages
@@ -83,7 +88,9 @@ def test_info_shows_dependencies(
 
 
 def test_info_json_output(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
     args = _make_args(json=True)
@@ -93,6 +100,3 @@ def test_info_json_output(
     assert data["name"] == "default"
     assert "conda_dependencies" in data
     assert "channels" in data
-
-
-

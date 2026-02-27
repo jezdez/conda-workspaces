@@ -63,7 +63,9 @@ class ManifestExistsError(CondaWorkspacesError):
 
     def __init__(self, path: str | Path) -> None:
         self.path = path
-        super().__init__(f"'{path}' already exists. Use a different format or location.")
+        super().__init__(
+            f"'{path}' already exists. Use a different format or location."
+        )
 
 
 class FeatureNotFoundError(CondaWorkspacesError):
@@ -103,9 +105,7 @@ class SolveError(CondaWorkspacesError):
     def __init__(self, environment: str, reason: str) -> None:
         self.environment = environment
         self.reason = reason
-        super().__init__(
-            f"Failed to solve environment '{environment}': {reason}"
-        )
+        super().__init__(f"Failed to solve environment '{environment}': {reason}")
 
 
 class ActivationError(CondaWorkspacesError):
@@ -114,9 +114,7 @@ class ActivationError(CondaWorkspacesError):
     def __init__(self, environment: str, reason: str) -> None:
         self.environment = environment
         self.reason = reason
-        super().__init__(
-            f"Failed to activate environment '{environment}': {reason}"
-        )
+        super().__init__(f"Failed to activate environment '{environment}': {reason}")
 
 
 class LockfileNotFoundError(CondaWorkspacesError):

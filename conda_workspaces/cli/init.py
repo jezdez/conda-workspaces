@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import tomlkit
 from conda.base.context import context as conda_context
 
 from ..exceptions import ManifestExistsError
+
+if TYPE_CHECKING:
+    import argparse
 
 
 def execute_init(args: argparse.Namespace) -> int:
@@ -41,9 +44,7 @@ def _detect_platforms() -> list[str]:
     return sorted(defaults)
 
 
-def _write_pixi_toml(
-    name: str, channels: list[str], platforms: list[str]
-) -> int:
+def _write_pixi_toml(name: str, channels: list[str], platforms: list[str]) -> int:
     path = Path("pixi.toml")
     if path.exists():
         raise ManifestExistsError(path)
@@ -65,9 +66,7 @@ def _write_pixi_toml(
     return 0
 
 
-def _write_conda_toml(
-    name: str, channels: list[str], platforms: list[str]
-) -> int:
+def _write_conda_toml(name: str, channels: list[str], platforms: list[str]) -> int:
     path = Path("conda.toml")
     if path.exists():
         raise ManifestExistsError(path)
@@ -89,9 +88,7 @@ def _write_conda_toml(
     return 0
 
 
-def _write_pyproject_toml(
-    name: str, channels: list[str], platforms: list[str]
-) -> int:
+def _write_pyproject_toml(name: str, channels: list[str], platforms: list[str]) -> int:
     path = Path("pyproject.toml")
 
     if path.exists():

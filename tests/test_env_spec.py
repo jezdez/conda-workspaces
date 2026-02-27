@@ -205,9 +205,7 @@ def test_conda_lock_spec_env_returns_explicit_packages(
     assert env.name == "default"
     assert env.platform == "linux-64"
     assert len(env.explicit_packages) == 1
-    assert (
-        env.explicit_packages[0].url == "https://example.com/python-3.10.conda"
-    )
+    assert env.explicit_packages[0].url == "https://example.com/python-3.10.conda"
 
 
 def test_conda_lock_spec_env_includes_pypi_external(
@@ -257,9 +255,7 @@ def test_conda_lock_spec_env_missing_platform(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     spec = CondaLockSpec(path)
-    with pytest.raises(
-        ValueError, match="does not list packages for platform"
-    ):
+    with pytest.raises(ValueError, match="does not list packages for platform"):
         spec.env
 
 

@@ -28,9 +28,7 @@ def test_conda_subcommands_yields_workspace() -> None:
         ("conda-workspaces-lock", "CondaLockSpec"),
     ],
 )
-def test_conda_environment_specifiers(
-    name: str, expected_cls_name: str
-) -> None:
+def test_conda_environment_specifiers(name: str, expected_cls_name: str) -> None:
     items = {s.name: s for s in conda_environment_specifiers()}
     assert name in items
     assert items[name].environment_spec.__name__ == expected_cls_name

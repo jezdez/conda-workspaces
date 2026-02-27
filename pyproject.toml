@@ -128,6 +128,7 @@ docs = {features = ["docs"], solve-group = "default"}
 [tool.pixi.tasks]
 lint = "ruff check conda_workspaces tests"
 format = "ruff format conda_workspaces tests"
+format-check = "ruff format --check conda_workspaces tests"
 typecheck = "ty check conda_workspaces"
 test = "pytest"
 test-cov = "pytest --cov --cov-report=term-missing --cov-report=html"

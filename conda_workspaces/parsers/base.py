@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import ClassVar
+from typing import TYPE_CHECKING
 
-from ..models import WorkspaceConfig
+if TYPE_CHECKING:
+    from pathlib import Path
+    from typing import ClassVar
+
+    from ..models import WorkspaceConfig
 
 
 class WorkspaceParser(ABC):

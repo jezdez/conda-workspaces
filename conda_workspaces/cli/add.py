@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-import argparse
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import tomlkit
 
 from ..parsers import detect_workspace_file
+
+if TYPE_CHECKING:
+    import argparse
 
 
 def execute_add(args: argparse.Namespace) -> int:
@@ -36,7 +38,10 @@ def execute_add(args: argparse.Namespace) -> int:
     label = "PyPI" if is_pypi else "conda"
     location = f"feature '{target_feature}'" if target_feature else "default"
 
-    print(f"Added {len(specs)} {label} dependency(ies) to {location} in {manifest_path.name}")
+    print(
+        f"Added {len(specs)} {label} dependency(ies)"
+        f" to {location} in {manifest_path.name}"
+    )
     return 0
 
 

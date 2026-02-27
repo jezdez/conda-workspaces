@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from conda_workspaces.cli.lock import execute_lock
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _LOCK_DEFAULTS = {
     "file": None,

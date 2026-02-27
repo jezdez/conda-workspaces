@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from conda_workspaces.cli.activate import execute_activate
-from conda_workspaces.exceptions import EnvironmentNotFoundError, EnvironmentNotInstalledError
+from conda_workspaces.exceptions import (
+    EnvironmentNotFoundError,
+    EnvironmentNotInstalledError,
+)
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _ACTIVATE_DEFAULTS = {"file": None, "env_name": "default"}
 
@@ -28,7 +34,8 @@ def test_activate_prints_command(
 
     printed: list[str] = []
     monkeypatch.setattr(
-        "conda_workspaces.cli.activate.print_activate", lambda prefix: printed.append(prefix)
+        "conda_workspaces.cli.activate.print_activate",
+        lambda prefix: printed.append(prefix),
     )
 
     args = _make_args()

@@ -11,7 +11,6 @@ from conda_workspaces.models import (
     Channel,
     Environment,
     Feature,
-    MatchSpec,
     WorkspaceConfig,
 )
 
@@ -44,7 +43,9 @@ def test_envs_dir(config: WorkspaceConfig) -> None:
     assert ctx.envs_dir == Path(config.root) / ".conda" / "envs"
 
 
-def test_platform_cached(config: WorkspaceConfig, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_platform_cached(
+    config: WorkspaceConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """platform property lazily imports from conda and caches the result."""
     ctx = WorkspaceContext(config)
 

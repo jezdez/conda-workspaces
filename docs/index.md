@@ -3,14 +3,38 @@
 Project-scoped multi-environment workspace management for conda, with pixi
 manifest compatibility.
 
+Define your environments, features, and dependencies in a single manifest.
+conda-workspaces reads `conda.toml`, `pixi.toml`, or `pyproject.toml` and
+delegates solving and installation to conda — no extra solver, no new
+package manager, just workspaces on top of the tools you already use.
+
+## Install
+
+::::{tab-set}
+
+:::{tab-item} conda
+
 ```bash
-cw install              # create all workspace environments
-cw run -e test -- pytest  # run a command in an environment
-cw list                 # show defined environments
+conda install -c conda-forge conda-workspaces
 ```
 
+:::
+
+:::{tab-item} pixi
+
+```bash
+pixi global install conda-workspaces
+```
+
+:::
+
+::::
+
+## Define a workspace
+
+Create a `conda.toml` in your project root:
+
 ```toml
-# conda.toml
 [workspace]
 name = "my-project"
 channels = ["conda-forge"]
@@ -28,6 +52,41 @@ default = { solve-group = "default" }
 test = { features = ["test"], solve-group = "default" }
 ```
 
+Then install and use your environments:
+
+```bash
+cw install                    # solve + install + generate conda.lock
+cw run -e test -- pytest -v   # run a command in an environment
+cw install --locked           # reproducible install from conda.lock
+cw list                       # show defined environments
+```
+
+Environments are standard conda prefixes stored in `.conda/envs/` inside
+your project directory. They work with `conda activate` and all existing
+conda tooling.
+
+## Why conda-workspaces?
+
+[pixi](https://pixi.sh) introduced an excellent workspace model for
+managing multi-environment projects, but it brings its own solver and
+installation machinery. conda-workspaces reuses that same manifest format
+while delegating all solving and installation to conda's existing
+infrastructure.
+
+This means:
+
+- Workspaces read from `pixi.toml`, `conda.toml`, or `pyproject.toml` —
+  one manifest, multiple tools
+- Environments are solved by conda / libmamba and installed as regular
+  conda prefixes
+- Lock files use the rattler-lock v6 format (`conda.lock`), compatible
+  with pixi's `pixi.lock`
+- Composable features, solve-groups, platform overrides, and PyPI
+  dependencies all work out of the box
+- Ships as a conda plugin (`conda workspace`) and a standalone `cw` CLI
+
+Read more in [](motivation.md).
+
 ---
 
 ::::{grid} 2
@@ -37,7 +96,7 @@ test = { features = ["test"], solve-group = "default" }
 :link: quickstart
 :link-type: doc
 
-Install conda-workspaces and set up your first workspace in under a minute.
+Set up your first workspace in under a minute.
 :::
 
 :::{grid-item-card} {octicon}`mortar-board` Tutorials

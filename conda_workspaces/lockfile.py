@@ -125,11 +125,7 @@ def generate_lockfile(
     Returns the path to the generated lockfile.
     """
     if env_names is None:
-        env_names = [
-            name
-            for name in ctx.config.environments
-            if ctx.env_exists(name)
-        ]
+        env_names = [name for name in ctx.config.environments if ctx.env_exists(name)]
 
     platform = ctx.platform
     environments: dict[tuple[str, str], Environment] = {}
@@ -145,9 +141,7 @@ def generate_lockfile(
         environments[(name, platform)] = env
 
         # Resolve channels from workspace config
-        channels_by_env[name] = [
-            str(ch) for ch in ctx.config.channels
-        ]
+        channels_by_env[name] = [str(ch) for ch in ctx.config.channels]
 
     data = _build_lockfile_dict(environments, channels_by_env)
 

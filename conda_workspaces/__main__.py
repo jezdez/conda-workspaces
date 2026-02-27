@@ -13,8 +13,6 @@ It reuses the same parser and execute logic as ``conda workspace``.
 
 from __future__ import annotations
 
-import sys
-
 
 def main(args: list[str] | None = None) -> None:
     """Entry point for the ``cw`` console script."""

@@ -17,8 +17,8 @@ from dataclasses import dataclass, field
 from typing import ClassVar
 
 from conda.base.constants import KNOWN_SUBDIRS
-from conda.models.channel import Channel
-from conda.models.match_spec import MatchSpec
+from conda.models.channel import Channel  # noqa: TC002
+from conda.models.match_spec import MatchSpec  # noqa: TC002
 
 from .exceptions import (
     EnvironmentNotFoundError,

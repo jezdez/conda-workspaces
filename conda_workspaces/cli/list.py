@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-import argparse
 import json
+from typing import TYPE_CHECKING
 
 from ..context import WorkspaceContext
 from ..envs import list_installed_environments
 from ..parsers import detect_and_parse
+
+if TYPE_CHECKING:
+    import argparse
 
 
 def execute_list(args: argparse.Namespace) -> int:
@@ -25,12 +28,14 @@ def execute_list(args: argparse.Namespace) -> int:
     for name, env in sorted(config.environments.items()):
         if installed_only and name not in installed:
             continue
-        rows.append({
-            "name": name,
-            "features": env.features,
-            "solve_group": env.solve_group or "",
-            "installed": name in installed,
-        })
+        rows.append(
+            {
+                "name": name,
+                "features": env.features,
+                "solve_group": env.solve_group or "",
+                "installed": name in installed,
+            }
+        )
 
     if json_output:
         print(json.dumps(rows, indent=2))

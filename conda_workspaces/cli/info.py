@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-import argparse
 import json
+from typing import TYPE_CHECKING
 
 from ..context import WorkspaceContext
 from ..envs import get_environment_info
 from ..parsers import detect_and_parse
 from ..resolver import resolve_environment
+
+if TYPE_CHECKING:
+    import argparse
 
 
 def execute_info(args: argparse.Namespace) -> int:
