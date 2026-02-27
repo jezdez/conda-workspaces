@@ -8,8 +8,7 @@ Registers two environment specifiers:
     ``requested_packages`` so the solver can resolve them.
 
 ``conda-workspaces-lock``
-    Handles ``conda.lock`` files (rattler-lock v6 format, the same
-    structure as ``pixi.lock``).  Returns ``explicit_packages`` so
+    Handles ``conda.lock`` files.  Returns ``explicit_packages`` so
     ``conda env create`` installs exact URLs without solving.
 
 These allow the standard conda workflow::
@@ -98,9 +97,7 @@ class CondaWorkspaceSpec(EnvironmentSpecBase):
 class CondaLockSpec(EnvironmentSpecBase):
     """Parse a ``conda.lock`` file for ``conda env create``.
 
-    ``conda.lock`` uses the rattler-lock v6 format (same structure as
-    ``pixi.lock``).  Returns ``explicit_packages`` so the solver is
-    bypassed entirely.
+    Returns ``explicit_packages`` so the solver is bypassed entirely.
     """
 
     detection_supported: ClassVar[bool] = True
@@ -124,7 +121,7 @@ class CondaLockSpec(EnvironmentSpecBase):
             return False
         try:
             data = self._load()
-            return data.get("version") == 6
+            return data.get("version") == 1
         except Exception:
             return False
 

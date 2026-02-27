@@ -125,10 +125,10 @@ def test_conda_workspace_spec_env_name_fallback_to_dirname(
     [
         (
             "conda.lock",
-            "version: 6\nenvironments: {}\npackages: []\n",
+            "version: 1\nenvironments: {}\npackages: []\n",
             True,
         ),
-        ("pixi.lock", "version: 6\n", False),
+        ("pixi.lock", "version: 1\n", False),
         ("conda.lock", "version: 5\n", False),
         ("conda.lock", "{{not yaml::", False),
     ],
@@ -149,7 +149,7 @@ def test_conda_lock_spec_can_handle_missing_file(tmp_path: Path) -> None:
 def test_conda_lock_spec_can_handle_caches_result(tmp_path: Path) -> None:
     """Second call to can_handle reuses cached data."""
     path = tmp_path / "conda.lock"
-    content = "version: 6\nenvironments: {}\npackages: []\n"
+    content = "version: 1\nenvironments: {}\npackages: []\n"
     path.write_text(content, encoding="utf-8")
     spec = CondaLockSpec(path)
     assert spec.can_handle() is True
@@ -162,7 +162,7 @@ def test_conda_lock_spec_can_handle_caches_result(tmp_path: Path) -> None:
 @pytest.fixture
 def lockfile_content() -> str:
     return (
-        "version: 6\n"
+        "version: 1\n"
         "environments:\n"
         "  default:\n"
         "    channels:\n"
@@ -234,7 +234,7 @@ def test_conda_lock_spec_env_includes_pypi_external(
 def test_conda_lock_spec_env_missing_environment(tmp_path: Path) -> None:
     path = tmp_path / "conda.lock"
     path.write_text(
-        "version: 6\nenvironments:\n  test: {}\npackages: []\n",
+        "version: 1\nenvironments:\n  test: {}\npackages: []\n",
         encoding="utf-8",
     )
     spec = CondaLockSpec(path)
@@ -245,7 +245,7 @@ def test_conda_lock_spec_env_missing_environment(tmp_path: Path) -> None:
 def test_conda_lock_spec_env_missing_platform(tmp_path: Path) -> None:
     path = tmp_path / "conda.lock"
     path.write_text(
-        "version: 6\n"
+        "version: 1\n"
         "environments:\n"
         "  default:\n"
         "    channels: []\n"

@@ -141,7 +141,7 @@ def test_multiplatform_export_returns_yaml() -> None:
     yaml_str = multiplatform_export([env])  # type: ignore[arg-type]
 
     assert isinstance(yaml_str, str)
-    assert "version: 6" in yaml_str
+    assert "version: 1" in yaml_str
     assert "https://example.com/numpy-1.24.conda" in yaml_str
     assert "default" in yaml_str
     assert "linux-64" in yaml_str
@@ -150,6 +150,6 @@ def test_multiplatform_export_returns_yaml() -> None:
 def test_multiplatform_export_empty() -> None:
     yaml_str = multiplatform_export([])  # type: ignore[arg-type]
 
-    assert "version: 6" in yaml_str
+    assert "version: 1" in yaml_str
     assert "environments: {}" in yaml_str
     assert "packages: []" in yaml_str

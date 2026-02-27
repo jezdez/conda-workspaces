@@ -10,7 +10,7 @@ relate and how to use them side by side.
 |---|---|---|
 | Solver | rattler (bundled) | conda / libmamba |
 | Environment location | `.pixi/envs/` | `.conda/envs/` |
-| Lock file | `pixi.lock` | `conda.lock` (same rattler-lock v6 format) |
+| Lock file | `pixi.lock` | `conda.lock` |
 | Task runner | Built-in | Use [conda-tasks](https://github.com/conda-incubator/conda-tasks) |
 | Package builds | pixi-build (rattler-build) | conda-build (separate) |
 | CLI | `pixi` | `cw` / `conda workspace` |

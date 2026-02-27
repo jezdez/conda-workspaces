@@ -80,8 +80,8 @@ This means:
   one manifest, multiple tools
 - Environments are solved by conda / libmamba and installed as regular
   conda prefixes
-- Lock files use the rattler-lock v6 format (`conda.lock`), compatible
-  with pixi's `pixi.lock`
+- Lock files (`conda.lock`) capture exact package URLs for reproducible
+  installs without re-solving
 - Composable features, solve-groups, platform overrides, and PyPI
   dependencies all work out of the box
 - Ships as a conda plugin (`conda workspace`) and a standalone `cw` CLI

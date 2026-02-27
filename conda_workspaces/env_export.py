@@ -1,7 +1,6 @@
 """Environment exporter plugin for ``conda export --format=conda-workspaces-lock``.
 
-Exports installed conda environments to ``conda.lock`` in the
-rattler-lock v6 format (same structure as ``pixi.lock``).  This
+Exports installed conda environments to ``conda.lock``.  This
 allows::
 
     conda export --format=conda-workspaces-lock --file=conda.lock
@@ -41,7 +40,7 @@ DEFAULT_FILENAMES = ("conda.lock",)
 
 
 def _envs_to_dict(envs: Iterable[Environment]) -> dict[str, Any]:
-    """Build a rattler-lock v6 dict from conda ``Environment`` objects."""
+    """Build a lockfile dict from conda ``Environment`` objects."""
     seen_urls: set[str] = set()
     packages: list[dict[str, Any]] = []
     environments: dict[str, dict[str, Any]] = {}
@@ -81,7 +80,7 @@ def _envs_to_dict(envs: Iterable[Environment]) -> dict[str, Any]:
 
 
 def multiplatform_export(envs: Iterable[Environment]) -> str:
-    """Export ``Environment`` objects to a rattler-lock v6 YAML string.
+    """Export ``Environment`` objects to a ``conda.lock`` YAML string.
 
     This function is registered as the ``multiplatform_export`` callable
     on the ``CondaEnvironmentExporter``.  conda calls it with one

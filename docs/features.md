@@ -149,9 +149,8 @@ These are stored and validated during environment installation.
 
 After installing environments, conda-workspaces generates a `conda.lock`
 file at the project root. This lockfile records the exact packages
-installed in each environment using the
-[rattler-lock v6](https://github.com/conda/rattler/blob/main/crates/rattler_lock/src/parse/v6.rs)
-format (the same format pixi uses for `pixi.lock`).
+installed in each environment, enabling reproducible installs without
+re-solving.
 
 ```bash
 # Generate or update the lockfile
@@ -164,7 +163,7 @@ cw install --locked
 The lockfile contains all environments and their resolved packages:
 
 ```yaml
-version: 6
+version: 1
 environments:
   default:
     channels:

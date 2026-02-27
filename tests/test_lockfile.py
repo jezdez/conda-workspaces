@@ -60,7 +60,7 @@ def test_lockfile_exists_false(tmp_path: Path) -> None:
 
 def test_lockfile_exists_true(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
-    (tmp_path / LOCKFILE_NAME).write_text("version: 6\n", encoding="utf-8")
+    (tmp_path / LOCKFILE_NAME).write_text("version: 1\n", encoding="utf-8")
     assert lockfile_exists(ctx) is True
 
 
@@ -83,7 +83,7 @@ def test_record_to_dict(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_build_lockfile_dict() -> None:
-    """_build_lockfile_dict produces correct rattler-lock v6 structure."""
+    """_build_lockfile_dict produces correct lockfile structure."""
 
     class FakePkg:
         def __init__(self, name: str, url: str):
@@ -130,7 +130,7 @@ def test_build_lockfile_dict() -> None:
 
 def test_extract_env_packages() -> None:
     data = {
-        "version": 6,
+        "version": 1,
         "environments": {
             "default": {
                 "channels": [{"url": "conda-forge"}],
@@ -163,14 +163,14 @@ def test_extract_env_packages() -> None:
 
 
 def test_extract_env_packages_missing_env() -> None:
-    data = {"version": 6, "environments": {}, "packages": []}
+    data = {"version": 1, "environments": {}, "packages": []}
     with pytest.raises(LockfileNotFoundError, match="no-such-env"):
         _extract_env_packages(data, "no-such-env", "linux-64")
 
 
 def test_extract_env_packages_missing_platform() -> None:
     data = {
-        "version": 6,
+        "version": 1,
         "environments": {
             "default": {
                 "channels": [],
@@ -187,7 +187,7 @@ def test_generate_lockfile(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """generate_lockfile builds & writes conda.lock in rattler-lock v6 format."""
+    """generate_lockfile builds & writes conda.lock."""
     ctx = _make_ctx(tmp_path, env_names=["default", "test"])
 
     class FakePkg:
@@ -226,7 +226,7 @@ def test_generate_lockfile(
     assert result.is_file()
 
     content = result.read_text(encoding="utf-8")
-    assert "version: 6" in content
+    assert "version: 1" in content
     assert "default" in content
     assert "test" in content
     assert "https://example.com/python.conda" in content
@@ -272,7 +272,7 @@ def test_install_from_lockfile(
     # Write a minimal conda.lock
     lockfile = tmp_path / LOCKFILE_NAME
     lockfile.write_text(
-        "version: 6\n"
+        "version: 1\n"
         "environments:\n"
         "  default:\n"
         "    channels:\n"

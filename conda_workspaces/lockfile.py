@@ -1,13 +1,12 @@
 """Lockfile generation and consumption for reproducible environments.
 
-Produces a single ``conda.lock`` at the workspace root in
-rattler-lock v6 format (the same format as ``pixi.lock``).  The file
+Produces a single ``conda.lock`` at the workspace root.  The file
 captures all environments and platforms so that installations can be
 reproduced exactly without running the solver.
 
 The format is a YAML document with three top-level keys::
 
-    version: 6
+    version: 1
     environments:
       <name>:
         channels: [{url: ...}, ...]
@@ -43,8 +42,8 @@ if TYPE_CHECKING:
 
     from .context import WorkspaceContext
 
-#: Lockfile format version (rattler-lock v6, same as pixi.lock).
-LOCKFILE_VERSION = 6
+#: Lockfile format version.
+LOCKFILE_VERSION = 1
 
 #: The canonical lockfile filename.
 LOCKFILE_NAME = "conda.lock"
@@ -74,7 +73,7 @@ def _build_lockfile_dict(
     environments: dict[str, Environment],
     channels_by_env: dict[str, list[str]],
 ) -> dict[str, Any]:
-    """Build the rattler-lock v6 dict from a set of Environment objects.
+    """Build the lockfile dict from a set of Environment objects.
 
     *environments* maps ``(env_name, platform)`` pairs to
     :class:`~conda.models.environment.Environment` objects — each
@@ -119,7 +118,7 @@ def generate_lockfile(
     """Generate a ``conda.lock`` from installed workspace environments.
 
     Snapshots every installed environment (or only *env_names* when
-    given) into a single rattler-lock v6 YAML file at the workspace
+    given) into a single ``conda.lock`` YAML file at the workspace
     root.
 
     Returns the path to the generated lockfile.
