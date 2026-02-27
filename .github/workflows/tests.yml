@@ -34,9 +34,9 @@ jobs:
         with:
           environments: dev
       - name: Lint
-        run: pixi run lint
+        run: pixi run -e dev lint
       - name: Format check
-        run: pixi run format -- --check
+        run: pixi run -e dev format -- --check
 
   tests:
     name: ${{ matrix.os }}, Python ${{ matrix.python-version }}
@@ -61,7 +61,7 @@ jobs:
         with:
           environments: test
       - name: Run tests
-        run: pixi run test-cov -- -v --tb=short
+        run: pixi run -e test test-cov -- -v --tb=short
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
