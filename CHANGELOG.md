@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+## 0.1.1 — 2026-03-05
+
+### Changed
+
+- Transferred repository to conda-incubator organization
+- Added PyPI release workflow with trusted publishing
+- Moved changelog to repository root
+
 ## 0.1.0 — 2026-03-05
 
 ### Added
