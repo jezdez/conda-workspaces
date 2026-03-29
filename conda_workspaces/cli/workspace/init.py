@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import tomlkit
 from conda.base.context import context as conda_context
+from rich.console import Console
 
 from ...exceptions import ManifestExistsError
 
@@ -14,8 +15,12 @@ if TYPE_CHECKING:
     import argparse
 
 
-def execute_init(args: argparse.Namespace) -> int:
+def execute_init(
+    args: argparse.Namespace, *, console: Console | None = None
+) -> int:
     """Create a new workspace manifest in the current directory."""
+    if console is None:
+        console = Console(highlight=False)
     fmt = args.manifest_format
     name = args.name or Path.cwd().name
     channels = args.channels or ["conda-forge"]
@@ -28,11 +33,17 @@ def execute_init(args: argparse.Namespace) -> int:
     base_dir = Path(args.file).parent if args.file else Path.cwd()
 
     if fmt == "pixi":
-        return _write_workspace_toml("pixi.toml", name, channels, platforms, base_dir)
+        return _write_workspace_toml(
+            "pixi.toml", name, channels, platforms, base_dir, console=console
+        )
     elif fmt == "conda":
-        return _write_workspace_toml("conda.toml", name, channels, platforms, base_dir)
+        return _write_workspace_toml(
+            "conda.toml", name, channels, platforms, base_dir, console=console
+        )
     elif fmt == "pyproject":
-        return _write_pyproject_toml(name, channels, platforms, base_dir)
+        return _write_pyproject_toml(
+            name, channels, platforms, base_dir, console=console
+        )
 
     return 1
 
@@ -48,6 +59,8 @@ def _write_workspace_toml(
     channels: list[str],
     platforms: list[str],
     base_dir: Path,
+    *,
+    console: Console,
 ) -> int:
     path = base_dir / filename
     if path.exists():
@@ -65,7 +78,7 @@ def _write_workspace_toml(
     doc.add("dependencies", deps)
 
     path.write_text(tomlkit.dumps(doc), encoding="utf-8")
-    print(f"Created {path}")
+    console.print(f"Created [dim]{path}[/dim]")
     return 0
 
 
@@ -74,6 +87,8 @@ def _write_pyproject_toml(
     channels: list[str],
     platforms: list[str],
     base_dir: Path,
+    *,
+    console: Console,
 ) -> int:
     path = base_dir / "pyproject.toml"
     existed = path.exists()
@@ -100,5 +115,5 @@ def _write_pyproject_toml(
     tool.add("conda", conda)
 
     path.write_text(tomlkit.dumps(doc), encoding="utf-8")
-    print(f"{'Updated' if existed else 'Created'} {path}")
+    console.print(f"{'Updated' if existed else 'Created'} [dim]{path}[/dim]")
     return 0

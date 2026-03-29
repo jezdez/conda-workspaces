@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from rich.console import Console
+
 from ...envs import install_environment
 from ...exceptions import LockfileNotFoundError, LockfileStaleError
 from ...lockfile import generate_lockfile, install_from_lockfile, lockfile_path
@@ -18,8 +20,12 @@ if TYPE_CHECKING:
     from ...models import WorkspaceConfig
 
 
-def execute_install(args: argparse.Namespace) -> int:
+def execute_install(
+    args: argparse.Namespace, *, console: Console | None = None
+) -> int:
     """Install (create/update) workspace environments."""
+    if console is None:
+        console = Console(highlight=False)
     config, ctx = workspace_context_from_args(args)
 
     env_name = getattr(args, "environment", None)
@@ -29,28 +35,32 @@ def execute_install(args: argparse.Namespace) -> int:
     frozen = getattr(args, "frozen", False)
 
     if frozen:
-        return _install_from_lockfile(ctx, config, env_name)
+        return _install_from_lockfile(ctx, config, env_name, console=console)
 
     if locked:
         _check_lockfile_freshness(ctx, config)
-        return _install_from_lockfile(ctx, config, env_name)
+        return _install_from_lockfile(ctx, config, env_name, console=console)
 
     if env_name:
         resolved = resolve_environment(config, env_name, ctx.platform)
-        print(f"Installing environment '{env_name}'...")
+        console.print(f"Installing environment [bold]'{env_name}'[/bold]...")
         install_environment(ctx, resolved, force_reinstall=force, dry_run=dry_run)
         if not dry_run:
             generate_lockfile(ctx, {env_name: resolved})
-        print(f"Environment '{env_name}' is ready at {ctx.env_prefix(env_name)}")
+        console.print(
+            f"Environment [bold]'{env_name}'[/bold] is ready at"
+            f" [dim]{ctx.env_prefix(env_name)}[/dim]"
+        )
     else:
         resolved_all = resolve_all_environments(config, ctx.platform)
         for name, resolved in resolved_all.items():
-            print(f"Installing environment '{name}'...")
+            console.print(f"Installing environment [bold]'{name}'[/bold]...")
             install_environment(ctx, resolved, force_reinstall=force, dry_run=dry_run)
-            print(f"  -> {ctx.env_prefix(name)}")
+            console.print(f"  [dim]->[/dim] [dim]{ctx.env_prefix(name)}[/dim]")
         if not dry_run:
             generate_lockfile(ctx, resolved_all)
-        print(f"\n{len(resolved_all)} environment(s) installed.")
+        n = len(resolved_all)
+        console.print(f"\n{n} {'environment' if n == 1 else 'environments'} installed.")
 
     return 0
 
@@ -71,18 +81,31 @@ def _install_from_lockfile(
     ctx: WorkspaceContext,
     config: WorkspaceConfig,
     env_name: str | None,
+    *,
+    console: Console,
 ) -> int:
     """Install environments from existing lockfiles (no solving)."""
     if env_name:
-        print(f"Installing environment '{env_name}' from lockfile...")
+        console.print(
+            f"Installing environment [bold]'{env_name}'[/bold] from lockfile..."
+        )
         install_from_lockfile(ctx, env_name)
-        print(f"Environment '{env_name}' is ready at {ctx.env_prefix(env_name)}")
+        console.print(
+            f"Environment [bold]'{env_name}'[/bold] is ready at"
+            f" [dim]{ctx.env_prefix(env_name)}[/dim]"
+        )
     else:
         env_names = list(config.environments)
         for name in env_names:
-            print(f"Installing environment '{name}' from lockfile...")
+            console.print(
+                f"Installing environment [bold]'{name}'[/bold] from lockfile..."
+            )
             install_from_lockfile(ctx, name)
-            print(f"  -> {ctx.env_prefix(name)}")
-        print(f"\n{len(env_names)} environment(s) installed from lockfiles.")
+            console.print(f"  [dim]->[/dim] [dim]{ctx.env_prefix(name)}[/dim]")
+        console.print(
+            f"\n{len(env_names)}"
+            f" {'environment' if len(env_names) == 1 else 'environments'}"
+            f" installed from lockfiles."
+        )
 
     return 0

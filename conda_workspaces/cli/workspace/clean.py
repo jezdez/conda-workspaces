@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from conda.exceptions import CondaSystemExit, DryRunExit
 from conda.reporters import confirm_yn
+from rich.console import Console
 
 from ...envs import clean_all, list_installed_environments, remove_environment
 from ...exceptions import EnvironmentNotFoundError
@@ -15,8 +16,12 @@ if TYPE_CHECKING:
     import argparse
 
 
-def execute_clean(args: argparse.Namespace) -> int:
+def execute_clean(
+    args: argparse.Namespace, *, console: Console | None = None
+) -> int:
     """Remove installed workspace environments."""
+    if console is None:
+        console = Console(highlight=False)
     config, ctx = workspace_context_from_args(args)
 
     env_name = getattr(args, "environment", None)
@@ -29,26 +34,34 @@ def execute_clean(args: argparse.Namespace) -> int:
                 )
 
             if not ctx.env_exists(env_name):
-                print(f"Environment '{env_name}' is not installed.")
+                console.print(
+                    f"Environment [bold]'{env_name}'[/bold] is not installed."
+                )
                 return 0
 
             confirm_yn(f"Remove environment '{env_name}'?")
 
             remove_environment(ctx, env_name)
-            print(f"Removed environment '{env_name}'.")
+            console.print(f"Removed environment [bold]'{env_name}'[/bold].")
         else:
             installed = list_installed_environments(ctx)
             if not installed:
-                print("No environments installed.")
+                console.print("No environments installed.")
                 return 0
 
-            print(f"This will remove {len(installed)} environment(s):")
+            console.print(
+                f"This will remove {len(installed)}"
+                f" {'environment' if len(installed) == 1 else 'environments'}:"
+            )
             for name in installed:
-                print(f"  - {name}")
+                console.print(f"  - {name}")
             confirm_yn("Continue?")
 
             clean_all(ctx)
-            print(f"Removed {len(installed)} environment(s).")
+            n = len(installed)
+            console.print(
+                f"Removed {n} {'environment' if n == 1 else 'environments'}."
+            )
     except (CondaSystemExit, DryRunExit):
         return 0
 

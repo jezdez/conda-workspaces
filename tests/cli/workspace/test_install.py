@@ -37,7 +37,7 @@ def _stub_lockfile(monkeypatch: pytest.MonkeyPatch) -> None:
     "env_arg, expected_names, output_fragment",
     [
         ("default", {"default"}, "Installing"),
-        (None, {"default", "test"}, "2 environment(s)"),
+        (None, {"default", "test"}, "2 environments"),
     ],
     ids=["single-env", "all-envs"],
 )

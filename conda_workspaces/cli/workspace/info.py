@@ -68,7 +68,6 @@ def _show_workspace_info(
         table.add_row("Platforms", ", ".join(info["platforms"]) or "(all)")
         table.add_row("Environments", ", ".join(info["environments"]))
         table.add_row("Features", ", ".join(info["features"]) or "(none)")
-        console.print()
         console.print(table)
 
     return 0
@@ -119,7 +118,6 @@ def _show_env_info(
         table.add_row("Platforms", ", ".join(info["platforms"]) or "(all)")
         if info["channel_priority"]:
             table.add_row("Channel priority", info["channel_priority"])
-        console.print()
         console.print(table)
 
         if info["conda_dependencies"]:

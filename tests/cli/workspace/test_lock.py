@@ -24,7 +24,7 @@ _DEFAULTS = {
     "env_arg, expected_keys, output_fragment",
     [
         ("default", {"default"}, "Lockfile written to"),
-        (None, {"default", "test"}, "2 environment(s) locked"),
+        (None, {"default", "test"}, "2 environments locked"),
     ],
     ids=["single-env", "all-envs"],
 )

@@ -73,7 +73,6 @@ def _list_packages(
         table.add_column("Build")
         for r in records:
             table.add_row(r.name, r.version, r.build)
-        console.print()
         console.print(table)
 
     return 0
@@ -116,7 +115,6 @@ def _list_environments(
             feats = ", ".join(row["features"]) if row["features"] else "(default)"  # type: ignore[arg-type]
             status = "yes" if row["installed"] else "no"
             table.add_row(row["name"], feats, status)  # type: ignore[arg-type]
-        console.print()
         console.print(table)
 
     return 0

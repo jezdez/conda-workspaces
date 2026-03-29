@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import tomlkit
+from rich.console import Console
 
 from ...parsers import detect_workspace_file
 
@@ -12,8 +13,12 @@ if TYPE_CHECKING:
     import argparse
 
 
-def execute_remove(args: argparse.Namespace) -> int:
+def execute_remove(
+    args: argparse.Namespace, *, console: Console | None = None
+) -> int:
     """Remove dependencies from the workspace manifest."""
+    if console is None:
+        console = Console(highlight=False)
     manifest_path = getattr(args, "file", None) or detect_workspace_file()
     specs = args.specs
     is_pypi = getattr(args, "pypi", False)
@@ -35,12 +40,13 @@ def execute_remove(args: argparse.Namespace) -> int:
         manifest_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
         label = "PyPI" if is_pypi else "conda"
         location = f"feature '{target_feature}'" if target_feature else "default"
-        print(
-            f"Removed {len(removed)} {label} dependency(ies)"
-            f" from {location} in {manifest_path.name}"
+        n = len(removed)
+        noun = "dependency" if n == 1 else "dependencies"
+        console.print(
+            f"Removed {n} {label} {noun} from {location} in {manifest_path.name}"
         )
     else:
-        print("No matching dependencies found to remove.")
+        console.print("No matching dependencies found to remove.")
 
     return 0
 

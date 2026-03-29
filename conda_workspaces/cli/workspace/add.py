@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import tomlkit
 from conda.models.match_spec import MatchSpec
+from rich.console import Console
 
 from ...parsers import detect_workspace_file
 
@@ -25,8 +26,12 @@ def _parse_spec(spec: str) -> tuple[str, str]:
     return ms.name, version
 
 
-def execute_add(args: argparse.Namespace) -> int:
+def execute_add(
+    args: argparse.Namespace, *, console: Console | None = None
+) -> int:
     """Add dependencies to the workspace manifest."""
+    if console is None:
+        console = Console(highlight=False)
     manifest_path = getattr(args, "file", None) or detect_workspace_file()
     specs = args.specs
     is_pypi = getattr(args, "pypi", False)
@@ -39,19 +44,18 @@ def execute_add(args: argparse.Namespace) -> int:
     dep_key = "pypi-dependencies" if is_pypi else "dependencies"
 
     if manifest_path.name == "pyproject.toml":
-        _add_to_pyproject(doc, specs, dep_key, target_feature)
+        _add_to_pyproject(doc, specs, dep_key, target_feature, console=console)
     else:
-        _add_to_toml(doc, specs, dep_key, target_feature)
+        _add_to_toml(doc, specs, dep_key, target_feature, console=console)
 
     manifest_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
 
     label = "PyPI" if is_pypi else "conda"
     location = f"feature '{target_feature}'" if target_feature else "default"
 
-    print(
-        f"Added {len(specs)} {label} dependency(ies)"
-        f" to {location} in {manifest_path.name}"
-    )
+    n = len(specs)
+    noun = "dependency" if n == 1 else "dependencies"
+    console.print(f"Added {n} {label} {noun} to {location} in {manifest_path.name}")
     return 0
 
 
@@ -60,6 +64,8 @@ def _add_to_toml(
     specs: list[str],
     dep_key: str,
     feature: str | None,
+    *,
+    console: Console,
 ) -> None:
     """Add deps to a pixi.toml or conda.toml document."""
     if feature:
@@ -71,7 +77,10 @@ def _add_to_toml(
             entry = tomlkit.inline_table()
             entry["features"] = [feature]
             envs[feature] = entry
-            print(f"Created environment '{feature}' with feature '{feature}'")
+            console.print(
+                f"Created environment [bold]'{feature}'[/bold]"
+                f" with feature '{feature}'"
+            )
     else:
         target = doc
 
@@ -86,6 +95,8 @@ def _add_to_pyproject(
     specs: list[str],
     dep_key: str,
     feature: str | None,
+    *,
+    console: Console,
 ) -> None:
     """Add deps to a pyproject.toml with [tool.conda.*] / [tool.pixi.*] tables."""
     tool = doc.setdefault("tool", tomlkit.table())
@@ -104,7 +115,10 @@ def _add_to_pyproject(
             entry = tomlkit.inline_table()
             entry["features"] = [feature]
             envs[feature] = entry
-            print(f"Created environment '{feature}' with feature '{feature}'")
+            console.print(
+                f"Created environment [bold]'{feature}'[/bold]"
+                f" with feature '{feature}'"
+            )
     else:
         target = source
 

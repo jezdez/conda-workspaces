@@ -71,7 +71,9 @@ def _apply_activation_env(prefix: Path, env_vars: dict[str, str]) -> None:
         return
     pd = PrefixData(str(prefix))
     pd.set_environment_env_vars(env_vars)
-    log.info("Set %d activation environment variable(s)", len(env_vars))
+    n = len(env_vars)
+    noun = "variable" if n == 1 else "variables"
+    log.info("Set %d activation environment %s", n, noun)
 
 
 def _apply_activation_scripts(prefix: Path, scripts: list[str]) -> None:
