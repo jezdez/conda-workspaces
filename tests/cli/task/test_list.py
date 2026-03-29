@@ -72,7 +72,9 @@ def test_list_shows_task_name(tmp_path):
 
 def test_list_shows_description_when_present(tmp_path):
     path = tmp_path / "conda.toml"
-    path.write_text('[tasks]\nbuild = "make"\n\n[tasks.test]\ncmd = "pytest"\ndescription = "Run tests"\n')
+    path.write_text(
+        '[tasks]\nbuild = "make"\n\n[tasks.test]\ncmd = "pytest"\ndescription = "Run tests"\n'
+    )
 
     console, buf = _make_console()
     execute_list(_list_args(path), console=console)

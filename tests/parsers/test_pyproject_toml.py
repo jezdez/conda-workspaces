@@ -149,7 +149,6 @@ python = ">=3.10"
     assert str(default.conda_dependencies["python"].version) == ">=3.12"
 
 
-
 def test_parse_activation(parser, tmp_path):
     """Activation scripts and env vars are parsed."""
     content = """\

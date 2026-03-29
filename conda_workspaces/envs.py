@@ -117,7 +117,8 @@ def _build_pypi_specs(
     Returns an empty list if ``conda-pypi`` is not installed.
     """
     pypi_deps = [
-        dep for dep in resolved.pypi_dependencies.values()
+        dep
+        for dep in resolved.pypi_dependencies.values()
         if not dep.path and not dep.git and not dep.url
     ]
     if not pypi_deps:

@@ -15,9 +15,7 @@ if TYPE_CHECKING:
     import argparse
 
 
-def execute_add(
-    args: argparse.Namespace, *, console: Console | None = None
-) -> int:
+def execute_add(args: argparse.Namespace, *, console: Console | None = None) -> int:
     """Execute the ``conda task add`` subcommand."""
     if console is None:
         console = Console(highlight=False)

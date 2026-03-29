@@ -41,7 +41,6 @@ _SEARCH_FILES: list[str] = [
 ]
 
 
-
 def _walk_manifests(
     start_dir: Path,
     predicate: str,
@@ -58,9 +57,9 @@ def _walk_manifests(
             candidate = current / fname
             if candidate.is_file():
                 for parser in _PARSERS:
-                    if parser.can_handle(candidate) and getattr(
-                        parser, predicate
-                    )(candidate):
+                    if parser.can_handle(candidate) and getattr(parser, predicate)(
+                        candidate
+                    ):
                         return candidate
         parent = current.parent
         if parent == current:
@@ -117,7 +116,6 @@ def detect_and_parse(
     path = detect_workspace_file(start_dir)
     config = _cached_parse(str(path))
     return path, config
-
 
 
 def detect_task_file(start_dir: Path | None = None) -> Path | None:

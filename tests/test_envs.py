@@ -440,8 +440,12 @@ def test_build_pypi_specs_skips_path_deps(
         name="default",
         pypi_dependencies={
             "local-pkg": PyPIDependency(name="local-pkg", path="./local"),
-            "git-pkg": PyPIDependency(name="git-pkg", git="https://example.com/repo.git"),
-            "url-pkg": PyPIDependency(name="url-pkg", url="https://example.com/pkg.whl"),
+            "git-pkg": PyPIDependency(
+                name="git-pkg", git="https://example.com/repo.git"
+            ),
+            "url-pkg": PyPIDependency(
+                name="url-pkg", url="https://example.com/pkg.whl"
+            ),
             "normal": PyPIDependency(name="normal", spec=">=1.0"),
         },
     )
@@ -581,9 +585,7 @@ def test_install_path_deps_success(
     resolved = ResolvedEnvironment(
         name="default",
         pypi_dependencies={
-            "local": PyPIDependency(
-                name="local", path="./src", editable=True
-            ),
+            "local": PyPIDependency(name="local", path="./src", editable=True),
         },
     )
     _install_path_deps(tmp_path, resolved)

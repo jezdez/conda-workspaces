@@ -163,9 +163,7 @@ def parse_feature_tasks(data: dict[str, Any], tasks: dict[str, Task]) -> None:
             _apply_target_overrides(feat_target, tasks)
 
 
-def _apply_target_overrides(
-    target: dict[str, Any], tasks: dict[str, Task]
-) -> None:
+def _apply_target_overrides(target: dict[str, Any], tasks: dict[str, Task]) -> None:
     """Apply ``[target.<platform>.tasks]`` overrides into *tasks*."""
     for platform, platform_data in target.items():
         if not isinstance(platform_data, dict):

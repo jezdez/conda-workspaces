@@ -77,7 +77,7 @@ python = ">=3.10"
 def test_add_conda_deps_to_pixi_toml(
     pixi_toml: Path, specs: list[str], expected_deps: dict[str, str]
 ) -> None:
-    args = make_args(_DEFAULTS,file=pixi_toml, specs=specs)
+    args = make_args(_DEFAULTS, file=pixi_toml, specs=specs)
     result = execute_add(args)
     assert result == 0
 
@@ -95,7 +95,7 @@ def test_add_conda_deps_to_pixi_toml(
     ids=["via-feature", "via-environment"],
 )
 def test_add_to_feature(pixi_toml: Path, kwargs: dict) -> None:
-    args = make_args(_DEFAULTS,file=pixi_toml, specs=["coverage"], **kwargs)
+    args = make_args(_DEFAULTS, file=pixi_toml, specs=["coverage"], **kwargs)
     execute_add(args)
 
     doc = tomlkit.loads(pixi_toml.read_text(encoding="utf-8"))
@@ -103,7 +103,7 @@ def test_add_to_feature(pixi_toml: Path, kwargs: dict) -> None:
 
 
 def test_add_pypi_deps(pixi_toml: Path) -> None:
-    args = make_args(_DEFAULTS,file=pixi_toml, specs=["requests >=2.0"], pypi=True)
+    args = make_args(_DEFAULTS, file=pixi_toml, specs=["requests >=2.0"], pypi=True)
     execute_add(args)
 
     doc = tomlkit.loads(pixi_toml.read_text(encoding="utf-8"))
@@ -111,7 +111,7 @@ def test_add_pypi_deps(pixi_toml: Path) -> None:
 
 
 def test_add_to_pyproject(pyproject_toml: Path) -> None:
-    args = make_args(_DEFAULTS,file=pyproject_toml, specs=["numpy >=1.24"])
+    args = make_args(_DEFAULTS, file=pyproject_toml, specs=["numpy >=1.24"])
     execute_add(args)
 
     doc = tomlkit.loads(pyproject_toml.read_text(encoding="utf-8"))
@@ -129,7 +129,7 @@ def test_add_to_pyproject(pyproject_toml: Path) -> None:
 def test_remove_from_pixi_toml(
     pixi_toml: Path, specs: list[str], remaining: list[str]
 ) -> None:
-    args = make_args(_DEFAULTS,file=pixi_toml, specs=specs)
+    args = make_args(_DEFAULTS, file=pixi_toml, specs=specs)
     result = execute_remove(args)
     assert result == 0
 
@@ -139,7 +139,7 @@ def test_remove_from_pixi_toml(
 
 
 def test_remove_from_feature(pixi_toml: Path) -> None:
-    args = make_args(_DEFAULTS,file=pixi_toml, specs=["pytest"], feature="test")
+    args = make_args(_DEFAULTS, file=pixi_toml, specs=["pytest"], feature="test")
     execute_remove(args)
 
     doc = tomlkit.loads(pixi_toml.read_text(encoding="utf-8"))
@@ -147,7 +147,7 @@ def test_remove_from_feature(pixi_toml: Path) -> None:
 
 
 def test_remove_from_pyproject(pyproject_toml: Path) -> None:
-    args = make_args(_DEFAULTS,file=pyproject_toml, specs=["python"])
+    args = make_args(_DEFAULTS, file=pyproject_toml, specs=["python"])
     execute_remove(args)
 
     doc = tomlkit.loads(pyproject_toml.read_text(encoding="utf-8"))
@@ -157,14 +157,16 @@ def test_remove_from_pyproject(pyproject_toml: Path) -> None:
 def test_remove_prints_no_match(
     pixi_toml: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    args = make_args(_DEFAULTS,file=pixi_toml, specs=["nonexistent"])
+    args = make_args(_DEFAULTS, file=pixi_toml, specs=["nonexistent"])
     execute_remove(args)
     assert "No matching" in capsys.readouterr().out
 
 
 def test_add_pypi_to_pyproject(pyproject_toml: Path) -> None:
     """Adding PyPI deps to pyproject.toml writes to pypi-dependencies."""
-    args = make_args(_DEFAULTS,file=pyproject_toml, specs=["requests >=2.0"], pypi=True)
+    args = make_args(
+        _DEFAULTS, file=pyproject_toml, specs=["requests >=2.0"], pypi=True
+    )
     execute_add(args)
     doc = tomlkit.loads(pyproject_toml.read_text(encoding="utf-8"))
     assert doc["tool"]["pixi"]["pypi-dependencies"]["requests"] == ">=2.0"
@@ -172,7 +174,7 @@ def test_add_pypi_to_pyproject(pyproject_toml: Path) -> None:
 
 def test_add_to_pyproject_feature(pyproject_toml: Path) -> None:
     """Adding deps to a feature in pyproject.toml."""
-    args = make_args(_DEFAULTS,file=pyproject_toml, specs=["pytest"], feature="test")
+    args = make_args(_DEFAULTS, file=pyproject_toml, specs=["pytest"], feature="test")
     execute_add(args)
     doc = tomlkit.loads(pyproject_toml.read_text(encoding="utf-8"))
     assert doc["tool"]["pixi"]["feature"]["test"]["dependencies"]["pytest"] == "*"
@@ -196,7 +198,7 @@ requests = ">=2.0"
     path = tmp_path / "pyproject.toml"
     path.write_text(content, encoding="utf-8")
     monkeypatch.chdir(tmp_path)
-    args = make_args(_DEFAULTS,file=path, specs=["requests"], pypi=True)
+    args = make_args(_DEFAULTS, file=path, specs=["requests"], pypi=True)
     execute_remove(args)
     doc = tomlkit.loads(path.read_text(encoding="utf-8"))
     assert "requests" not in doc["tool"]["pixi"]["pypi-dependencies"]
@@ -220,7 +222,7 @@ pytest = ">=8.0"
     path = tmp_path / "pyproject.toml"
     path.write_text(content, encoding="utf-8")
     monkeypatch.chdir(tmp_path)
-    args = make_args(_DEFAULTS,file=path, specs=["pytest"], feature="test")
+    args = make_args(_DEFAULTS, file=path, specs=["pytest"], feature="test")
     execute_remove(args)
     doc = tomlkit.loads(path.read_text(encoding="utf-8"))
     assert "pytest" not in doc["tool"]["pixi"]["feature"]["test"]["dependencies"]
@@ -237,7 +239,7 @@ name = "no-tool"
     path = tmp_path / "pyproject.toml"
     path.write_text(content, encoding="utf-8")
     monkeypatch.chdir(tmp_path)
-    args = make_args(_DEFAULTS,file=path, specs=["numpy"])
+    args = make_args(_DEFAULTS, file=path, specs=["numpy"])
     result = execute_remove(args)
     assert result == 0
     assert "No matching" in capsys.readouterr().out
@@ -258,7 +260,7 @@ def test_add_environment_auto_creates_env_entry(
 ) -> None:
     """Adding to an undefined environment auto-creates the env entry."""
     path = request.getfixturevalue(fixture_attr)
-    args = make_args(_DEFAULTS,file=path, specs=["numpy"], environment="newenv")
+    args = make_args(_DEFAULTS, file=path, specs=["numpy"], environment="newenv")
     result = execute_add(args)
     assert result == 0
 
@@ -273,12 +275,15 @@ def test_add_environment_auto_creates_env_entry(
 
 def test_add_environment_existing_env_no_duplicate(pixi_toml: Path) -> None:
     """Adding to an existing feature+env doesn't duplicate the env entry."""
-    args = make_args(_DEFAULTS,file=pixi_toml, specs=["coverage"], environment="test")
+    args = make_args(_DEFAULTS, file=pixi_toml, specs=["coverage"], environment="test")
     execute_add(args)
 
     # First add auto-created the env entry. Add again — it shouldn't duplicate.
     args2 = make_args(
-        _DEFAULTS, file=pixi_toml, specs=["hypothesis"], environment="test",
+        _DEFAULTS,
+        file=pixi_toml,
+        specs=["hypothesis"],
+        environment="test",
     )
     execute_add(args2)
 
@@ -302,7 +307,7 @@ def test_remove_prints_location(
     extra_kwargs: dict,
     expected_text: str,
 ) -> None:
-    args = make_args(_DEFAULTS,file=pixi_toml, specs=specs, **extra_kwargs)
+    args = make_args(_DEFAULTS, file=pixi_toml, specs=specs, **extra_kwargs)
     execute_remove(args)
     out = capsys.readouterr().out
     assert expected_text in out

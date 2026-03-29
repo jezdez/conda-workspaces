@@ -49,13 +49,11 @@ class ManifestParser(ABC):
     def add_task(self, path: Path, name: str, task: Task) -> None:
         """Persist a new task definition into *path*."""
         raise NotImplementedError(
-            f"Writing tasks to {path.name} is not supported. "
-            "Use conda.toml instead."
+            f"Writing tasks to {path.name} is not supported. Use conda.toml instead."
         )
 
     def remove_task(self, path: Path, name: str) -> None:
         """Remove the task named *name* from *path*."""
         raise NotImplementedError(
-            f"Writing tasks to {path.name} is not supported. "
-            "Use conda.toml instead."
+            f"Writing tasks to {path.name} is not supported. Use conda.toml instead."
         )

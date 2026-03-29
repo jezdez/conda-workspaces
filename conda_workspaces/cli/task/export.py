@@ -14,9 +14,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def execute_export(
-    args: argparse.Namespace, *, console: Console | None = None
-) -> int:
+def execute_export(args: argparse.Namespace, *, console: Console | None = None) -> int:
     """Execute the ``conda task export`` subcommand."""
     if console is None:
         console = Console(highlight=False)

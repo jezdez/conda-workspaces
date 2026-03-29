@@ -260,5 +260,3 @@ def test_conda_lock_spec_env_wrong_version_raises(tmp_path: Path) -> None:
     spec._data_cache = {"version": 99, "environments": {}, "packages": []}
     with pytest.raises(ValueError, match="Unsupported lockfile version"):
         spec.env
-
-

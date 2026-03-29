@@ -12,9 +12,7 @@ if TYPE_CHECKING:
     import argparse
 
 
-def execute_remove(
-    args: argparse.Namespace, *, console: Console | None = None
-) -> int:
+def execute_remove(args: argparse.Namespace, *, console: Console | None = None) -> int:
     """Execute the ``conda task remove`` subcommand."""
     if console is None:
         console = Console(highlight=False)

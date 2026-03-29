@@ -36,12 +36,8 @@ def test_main_task_no_args_shows_help() -> None:
 def test_main_sets_prog_to_cw(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_parser = _FakeParser()
 
-    monkeypatch.setattr(
-        cli_main_mod, "generate_workspace_parser", lambda: fake_parser
-    )
-    monkeypatch.setattr(
-        cli_main_mod, "execute_workspace", lambda parsed: 0
-    )
+    monkeypatch.setattr(cli_main_mod, "generate_workspace_parser", lambda: fake_parser)
+    monkeypatch.setattr(cli_main_mod, "execute_workspace", lambda parsed: 0)
 
     with pytest.raises(SystemExit) as exc_info:
         main([])
@@ -53,12 +49,8 @@ def test_main_sets_prog_to_cw(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_main_task_sets_prog_to_ct(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_parser = _FakeParser()
 
-    monkeypatch.setattr(
-        cli_main_mod, "generate_task_parser", lambda: fake_parser
-    )
-    monkeypatch.setattr(
-        cli_main_mod, "execute_task", lambda parsed: 0
-    )
+    monkeypatch.setattr(cli_main_mod, "generate_task_parser", lambda: fake_parser)
+    monkeypatch.setattr(cli_main_mod, "execute_task", lambda parsed: 0)
 
     with pytest.raises(SystemExit) as exc_info:
         main_task([])
@@ -77,12 +69,8 @@ def test_main_exits_with_execute_return_code(
 ) -> None:
     fake_parser = _FakeParser()
 
-    monkeypatch.setattr(
-        cli_main_mod, "generate_workspace_parser", lambda: fake_parser
-    )
-    monkeypatch.setattr(
-        cli_main_mod, "execute_workspace", lambda parsed: exit_code
-    )
+    monkeypatch.setattr(cli_main_mod, "generate_workspace_parser", lambda: fake_parser)
+    monkeypatch.setattr(cli_main_mod, "execute_workspace", lambda parsed: exit_code)
 
     with pytest.raises(SystemExit) as exc_info:
         main([])

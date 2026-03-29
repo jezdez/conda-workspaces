@@ -30,9 +30,7 @@ if TYPE_CHECKING:
 class CreateWorkspaceEnv(Protocol):
     """Callable signature for the tmp_workspace_env factory."""
 
-    def __call__(
-        self, workspace: Path, name: str, *, pkg_count: int = 0
-    ) -> Path: ...
+    def __call__(self, workspace: Path, name: str, *, pkg_count: int = 0) -> Path: ...
 
 
 @pytest.fixture
@@ -151,9 +149,7 @@ def tmp_workspace_env(tmp_env: TmpEnvFixture) -> Iterator[CreateWorkspaceEnv]:
             tmp_env(shallow=True, prefix=workspace / ".conda" / "envs" / name)
         )
         for i in range(pkg_count):
-            (prefix / "conda-meta" / f"pkg-{i}.json").write_text(
-                "{}", encoding="utf-8"
-            )
+            (prefix / "conda-meta" / f"pkg-{i}.json").write_text("{}", encoding="utf-8")
         return prefix
 
     with stack:

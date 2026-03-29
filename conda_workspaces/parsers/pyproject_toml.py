@@ -101,8 +101,7 @@ class PyprojectTomlParser(ManifestParser):
             return False
         tool = data.get("tool", {})
         return bool(
-            tool.get("conda", {}).get("tasks")
-            or tool.get("pixi", {}).get("tasks")
+            tool.get("conda", {}).get("tasks") or tool.get("pixi", {}).get("tasks")
         )
 
     def parse_tasks(self, path: Path) -> dict[str, Task]:

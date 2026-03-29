@@ -55,6 +55,6 @@ def test_activate_error(
     pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch, env_name: str, exc_type: type
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    args = make_args(_DEFAULTS,environment=env_name)
+    args = make_args(_DEFAULTS, environment=env_name)
     with pytest.raises(exc_type):
         execute_activate(args)

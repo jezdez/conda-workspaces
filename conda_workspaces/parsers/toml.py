@@ -96,9 +96,7 @@ def tasks_to_toml(tasks: dict[str, Task]) -> str:
             if override.args is not None:
                 ov.append("args", [a.to_toml() for a in override.args])
             if override.depends_on is not None:
-                ov.append(
-                    "depends-on", [d.to_toml() for d in override.depends_on]
-                )
+                ov.append("depends-on", [d.to_toml() for d in override.depends_on])
             targets.setdefault(platform, {})[name] = (
                 str(ov["cmd"]) if len(ov) == 1 and "cmd" in ov else ov
             )
@@ -288,12 +286,8 @@ def _parse_feature(name: str, feat_data: dict[str, Any]) -> Feature:
     per-feature logic is identical once the data dict is resolved.
     """
     feature = Feature(name=name)
-    feature.conda_dependencies = _parse_conda_deps(
-        feat_data.get("dependencies", {})
-    )
-    feature.pypi_dependencies = _parse_pypi_deps(
-        feat_data.get("pypi-dependencies", {})
-    )
+    feature.conda_dependencies = _parse_conda_deps(feat_data.get("dependencies", {}))
+    feature.pypi_dependencies = _parse_pypi_deps(feat_data.get("pypi-dependencies", {}))
     feature.channels = _parse_channels(feat_data.get("channels", []))
     feature.platforms = list(feat_data.get("platforms", []))
 
@@ -321,9 +315,7 @@ def _parse_features_and_envs(
     all named features, and all environments.  Shared by
     ``PixiTomlParser`` and ``PyprojectTomlParser``.
     """
-    config.features[Feature.DEFAULT_NAME] = _parse_feature(
-        Feature.DEFAULT_NAME, source
-    )
+    config.features[Feature.DEFAULT_NAME] = _parse_feature(Feature.DEFAULT_NAME, source)
 
     for feat_name, feat_data in source.get("feature", {}).items():
         config.features[feat_name] = _parse_feature(feat_name, feat_data)

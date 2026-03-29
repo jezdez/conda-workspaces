@@ -100,9 +100,7 @@ def test_resolve_platforms(feature_platforms, expected_platforms):
         "default": Environment(name="default"),
     }
     if env_name != "default":
-        environments[env_name] = Environment(
-            name=env_name, features=extra_features
-        )
+        environments[env_name] = Environment(name=env_name, features=extra_features)
 
     config = WorkspaceConfig(
         channels=[Channel("conda-forge")],
