@@ -14,6 +14,7 @@ regardless of which code path produced the file.
 
 from __future__ import annotations
 
+import io
 from typing import TYPE_CHECKING
 
 from conda.common.serialize.yaml import dump as yaml_dump
@@ -86,8 +87,6 @@ def multiplatform_export(envs: Iterable[Environment]) -> str:
     on the ``CondaEnvironmentExporter``.  conda calls it with one
     ``Environment`` per platform.
     """
-    import io
-
     env_dict = _envs_to_dict(envs)
     buf = io.StringIO()
     yaml_dump(env_dict, buf)

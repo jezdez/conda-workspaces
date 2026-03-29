@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from ..context import WorkspaceContext
 from ..envs import install_environment
+from ..exceptions import LockfileNotFoundError, LockfileStaleError
 from ..lockfile import generate_lockfile, install_from_lockfile, lockfile_path
 from ..parsers import detect_and_parse
 from ..resolver import resolve_all_environments, resolve_environment
@@ -58,8 +59,6 @@ def execute_install(args: argparse.Namespace) -> int:
 
 def _check_lockfile_freshness(ctx: WorkspaceContext, config: WorkspaceConfig) -> None:
     """Raise if the lockfile is missing or older than the manifest."""
-    from ..exceptions import LockfileNotFoundError, LockfileStaleError
-
     manifest = Path(config.manifest_path)
     lock = lockfile_path(ctx)
 
