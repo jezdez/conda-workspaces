@@ -11,7 +11,8 @@ from ...envs import install_environment
 from ...exceptions import LockfileNotFoundError, LockfileStaleError
 from ...lockfile import generate_lockfile, install_from_lockfile, lockfile_path
 from ...resolver import resolve_all_environments, resolve_environment
-from ._common import workspace_context_from_args
+from .. import status
+from . import workspace_context_from_args
 
 if TYPE_CHECKING:
     import argparse
@@ -20,9 +21,7 @@ if TYPE_CHECKING:
     from ...models import WorkspaceConfig
 
 
-def execute_install(
-    args: argparse.Namespace, *, console: Console | None = None
-) -> int:
+def execute_install(args: argparse.Namespace, *, console: Console | None = None) -> int:
     """Install (create/update) workspace environments."""
     if console is None:
         console = Console(highlight=False)
@@ -43,24 +42,20 @@ def execute_install(
 
     if env_name:
         resolved = resolve_environment(config, env_name, ctx.platform)
-        console.print(f"Installing environment [bold]'{env_name}'[/bold]...")
         install_environment(ctx, resolved, force_reinstall=force, dry_run=dry_run)
         if not dry_run:
             generate_lockfile(ctx, {env_name: resolved})
-        console.print(
-            f"Environment [bold]'{env_name}'[/bold] is ready at"
-            f" [dim]{ctx.env_prefix(env_name)}[/dim]"
-        )
+        status.done(console, env_name)
     else:
         resolved_all = resolve_all_environments(config, ctx.platform)
         for name, resolved in resolved_all.items():
-            console.print(f"Installing environment [bold]'{name}'[/bold]...")
+            status.running(console, name)
             install_environment(ctx, resolved, force_reinstall=force, dry_run=dry_run)
-            console.print(f"  [dim]->[/dim] [dim]{ctx.env_prefix(name)}[/dim]")
+            status.done(console, name)
         if not dry_run:
             generate_lockfile(ctx, resolved_all)
         n = len(resolved_all)
-        console.print(f"\n{n} {'environment' if n == 1 else 'environments'} installed.")
+        console.print(f"{n} {'environment' if n == 1 else 'environments'} installed.")
 
     return 0
 
@@ -86,26 +81,15 @@ def _install_from_lockfile(
 ) -> int:
     """Install environments from existing lockfiles (no solving)."""
     if env_name:
-        console.print(
-            f"Installing environment [bold]'{env_name}'[/bold] from lockfile..."
-        )
         install_from_lockfile(ctx, env_name)
-        console.print(
-            f"Environment [bold]'{env_name}'[/bold] is ready at"
-            f" [dim]{ctx.env_prefix(env_name)}[/dim]"
-        )
+        status.done(console, env_name)
     else:
         env_names = list(config.environments)
         for name in env_names:
-            console.print(
-                f"Installing environment [bold]'{name}'[/bold] from lockfile..."
-            )
+            status.running(console, name)
             install_from_lockfile(ctx, name)
-            console.print(f"  [dim]->[/dim] [dim]{ctx.env_prefix(name)}[/dim]")
-        console.print(
-            f"\n{len(env_names)}"
-            f" {'environment' if len(env_names) == 1 else 'environments'}"
-            f" installed from lockfiles."
-        )
+            status.done(console, name)
+        n = len(env_names)
+        console.print(f"{n} {'environment' if n == 1 else 'environments'} installed.")
 
     return 0

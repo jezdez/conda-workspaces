@@ -10,14 +10,13 @@ from conda.base.context import context as conda_context
 from rich.console import Console
 
 from ...exceptions import ManifestExistsError
+from .. import status
 
 if TYPE_CHECKING:
     import argparse
 
 
-def execute_init(
-    args: argparse.Namespace, *, console: Console | None = None
-) -> int:
+def execute_init(args: argparse.Namespace, *, console: Console | None = None) -> int:
     """Create a new workspace manifest in the current directory."""
     if console is None:
         console = Console(highlight=False)
@@ -78,7 +77,7 @@ def _write_workspace_toml(
     doc.add("dependencies", deps)
 
     path.write_text(tomlkit.dumps(doc), encoding="utf-8")
-    console.print(f"Created [dim]{path}[/dim]")
+    console.print(f"{status.DONE} Created [dim]{path}[/dim]")
     return 0
 
 
@@ -115,5 +114,6 @@ def _write_pyproject_toml(
     tool.add("conda", conda)
 
     path.write_text(tomlkit.dumps(doc), encoding="utf-8")
-    console.print(f"{'Updated' if existed else 'Created'} [dim]{path}[/dim]")
+    verb = "Updated" if existed else "Created"
+    console.print(f"{status.DONE} {verb} [dim]{path}[/dim]")
     return 0

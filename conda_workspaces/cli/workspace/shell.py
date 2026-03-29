@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ...exceptions import EnvironmentNotFoundError, EnvironmentNotInstalledError
-from ._common import workspace_context_from_args
+from . import workspace_context_from_args
 
 if TYPE_CHECKING:
     import argparse

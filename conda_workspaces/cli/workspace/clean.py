@@ -10,15 +10,14 @@ from rich.console import Console
 
 from ...envs import clean_all, list_installed_environments, remove_environment
 from ...exceptions import EnvironmentNotFoundError
-from ._common import workspace_context_from_args
+from .. import status
+from . import workspace_context_from_args
 
 if TYPE_CHECKING:
     import argparse
 
 
-def execute_clean(
-    args: argparse.Namespace, *, console: Console | None = None
-) -> int:
+def execute_clean(args: argparse.Namespace, *, console: Console | None = None) -> int:
     """Remove installed workspace environments."""
     if console is None:
         console = Console(highlight=False)
@@ -42,7 +41,7 @@ def execute_clean(
             confirm_yn(f"Remove environment '{env_name}'?")
 
             remove_environment(ctx, env_name)
-            console.print(f"Removed environment [bold]'{env_name}'[/bold].")
+            status.done(console, env_name)
         else:
             installed = list_installed_environments(ctx)
             if not installed:
@@ -60,7 +59,8 @@ def execute_clean(
             clean_all(ctx)
             n = len(installed)
             console.print(
-                f"Removed {n} {'environment' if n == 1 else 'environments'}."
+                f"{status.DONE} Removed {n}"
+                f" {'environment' if n == 1 else 'environments'}."
             )
     except (CondaSystemExit, DryRunExit):
         return 0

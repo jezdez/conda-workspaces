@@ -23,8 +23,8 @@ _DEFAULTS = {
 @pytest.mark.parametrize(
     "env_arg, expected_keys, output_fragment",
     [
-        ("default", {"default"}, "Lockfile written to"),
-        (None, {"default", "test"}, "2 environments locked"),
+        ("default", {"default"}, "✓"),
+        (None, {"default", "test"}, "2 environments"),
     ],
     ids=["single-env", "all-envs"],
 )
@@ -47,7 +47,7 @@ def test_lock_envs(
         )[1],
     )
 
-    result = execute_lock(make_args(_DEFAULTS,environment=env_arg))
+    result = execute_lock(make_args(_DEFAULTS, environment=env_arg))
     assert result == 0
     assert len(lock_calls) == 1
     assert set(lock_calls[0].keys()) == expected_keys
@@ -61,4 +61,4 @@ def test_lock_unknown_env(
     monkeypatch.chdir(pixi_workspace)
 
     with pytest.raises(EnvironmentNotFoundError):
-        execute_lock(make_args(_DEFAULTS,environment="nonexistent"))
+        execute_lock(make_args(_DEFAULTS, environment="nonexistent"))

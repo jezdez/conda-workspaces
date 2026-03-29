@@ -36,7 +36,7 @@ def _stub_lockfile(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.parametrize(
     "env_arg, expected_names, output_fragment",
     [
-        ("default", {"default"}, "Installing"),
+        ("default", {"default"}, "✓"),
         (None, {"default", "test"}, "2 environments"),
     ],
     ids=["single-env", "all-envs"],
@@ -103,7 +103,10 @@ def test_install_flags_forwarded(
     )
 
     args = make_args(
-        _DEFAULTS, environment="default", force_reinstall=force, dry_run=dry_run,
+        _DEFAULTS,
+        environment="default",
+        force_reinstall=force,
+        dry_run=dry_run,
     )
     execute_install(args)
     assert recorded[0] == (force, dry_run)
@@ -126,7 +129,7 @@ def test_install_dry_run_skips_lockfile(
         lambda ctx, resolved_envs: lock_calls.append(resolved_envs),
     )
 
-    args = make_args(_DEFAULTS,environment="default", dry_run=True)
+    args = make_args(_DEFAULTS, environment="default", dry_run=True)
     execute_install(args)
     assert lock_calls == []
 
@@ -134,8 +137,8 @@ def test_install_dry_run_skips_lockfile(
 @pytest.mark.parametrize(
     "env_arg, expected_names, output_fragment",
     [
-        ("default", {"default"}, "from lockfile"),
-        (None, {"default", "test"}, "from lockfiles"),
+        ("default", {"default"}, "✓"),
+        (None, {"default", "test"}, "installed"),
     ],
     ids=["single-env", "all-envs"],
 )
@@ -155,7 +158,7 @@ def test_install_frozen(
         lambda ctx, name: locked_calls.append(name),
     )
 
-    args = make_args(_DEFAULTS,environment=env_arg, frozen=True)
+    args = make_args(_DEFAULTS, environment=env_arg, frozen=True)
     result = execute_install(args)
     assert result == 0
     assert set(locked_calls) == expected_names
@@ -176,6 +179,6 @@ def test_install_locked_validates_freshness(
     manifest = pixi_workspace / "pixi.toml"
     manifest.write_text(manifest.read_text(encoding="utf-8"), encoding="utf-8")
 
-    args = make_args(_DEFAULTS,locked=True)
+    args = make_args(_DEFAULTS, locked=True)
     with pytest.raises(LockfileStaleError):
         execute_install(args)

@@ -39,11 +39,11 @@ def test_clean_single_environment(
     prefix = tmp_workspace_env(pixi_workspace, "default")
     assert prefix.is_dir()
 
-    args = make_args(_DEFAULTS,environment="default")
+    args = make_args(_DEFAULTS, environment="default")
     result = execute_clean(args)
     assert result == 0
     assert not prefix.is_dir()
-    assert "Removed" in capsys.readouterr().out
+    assert "✓" in capsys.readouterr().out
 
 
 def test_clean_all_environments(
@@ -79,7 +79,7 @@ def test_clean_nothing_to_remove(
     expected_msg: str,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    args = make_args(_DEFAULTS,environment=env_arg)
+    args = make_args(_DEFAULTS, environment=env_arg)
     result = execute_clean(args)
     assert result == 0
     assert expected_msg in capsys.readouterr().out
@@ -102,12 +102,10 @@ def test_clean_prompt_abort(
     def raise_abort(*args, **kwargs):
         raise CondaSystemExit()
 
-    monkeypatch.setattr(
-        "conda_workspaces.cli.workspace.clean.confirm_yn", raise_abort
-    )
+    monkeypatch.setattr("conda_workspaces.cli.workspace.clean.confirm_yn", raise_abort)
     monkeypatch.setattr("conda_workspaces.envs.unregister_env", lambda path: None)
 
-    args = make_args(_DEFAULTS,environment=env_arg)
+    args = make_args(_DEFAULTS, environment=env_arg)
     result = execute_clean(args)
     assert result == 0
     assert (pixi_workspace / ".conda" / "envs" / "default" / "conda-meta").is_dir()
@@ -118,6 +116,6 @@ def test_clean_undefined_environment(
 ) -> None:
     """clean with an undefined env raises EnvironmentNotFoundError."""
     monkeypatch.chdir(pixi_workspace)
-    args = make_args(_DEFAULTS,environment="nonexistent")
+    args = make_args(_DEFAULTS, environment="nonexistent")
     with pytest.raises(EnvironmentNotFoundError, match="not defined"):
         execute_clean(args)

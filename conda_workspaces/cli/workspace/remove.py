@@ -8,14 +8,13 @@ import tomlkit
 from rich.console import Console
 
 from ...parsers import detect_workspace_file
+from .. import status
 
 if TYPE_CHECKING:
     import argparse
 
 
-def execute_remove(
-    args: argparse.Namespace, *, console: Console | None = None
-) -> int:
+def execute_remove(args: argparse.Namespace, *, console: Console | None = None) -> int:
     """Remove dependencies from the workspace manifest."""
     if console is None:
         console = Console(highlight=False)
@@ -43,7 +42,8 @@ def execute_remove(
         n = len(removed)
         noun = "dependency" if n == 1 else "dependencies"
         console.print(
-            f"Removed {n} {label} {noun} from {location} in {manifest_path.name}"
+            f"{status.DONE} Removed {n} {label} {noun}"
+            f" from {location} in {manifest_path.name}"
         )
     else:
         console.print("No matching dependencies found to remove.")

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from conda.cli.common import print_activate
 
 from ...exceptions import EnvironmentNotFoundError, EnvironmentNotInstalledError
-from ._common import workspace_context_from_args
+from . import workspace_context_from_args
 
 if TYPE_CHECKING:
     import argparse

@@ -11,7 +11,7 @@ from rich.table import Table
 
 from ...envs import list_installed_environments
 from ...exceptions import EnvironmentNotFoundError, EnvironmentNotInstalledError
-from ._common import workspace_context_from_args
+from . import workspace_context_from_args
 
 if TYPE_CHECKING:
     import argparse
@@ -57,10 +57,12 @@ def _list_packages(
 
     if json_output:
         console.print_json(
-            json.dumps([
-                {"name": r.name, "version": r.version, "build": r.build}
-                for r in records
-            ])
+            json.dumps(
+                [
+                    {"name": r.name, "version": r.version, "build": r.build}
+                    for r in records
+                ]
+            )
         )
     else:
         if not records:

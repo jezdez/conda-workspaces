@@ -10,7 +10,7 @@ from rich.table import Table
 
 from ...envs import get_environment_info
 from ...resolver import resolve_environment
-from ._common import workspace_context_from_args
+from . import workspace_context_from_args
 
 if TYPE_CHECKING:
     import argparse

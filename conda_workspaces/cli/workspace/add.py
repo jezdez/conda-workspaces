@@ -9,6 +9,7 @@ from conda.models.match_spec import MatchSpec
 from rich.console import Console
 
 from ...parsers import detect_workspace_file
+from .. import status
 
 if TYPE_CHECKING:
     import argparse
@@ -26,9 +27,7 @@ def _parse_spec(spec: str) -> tuple[str, str]:
     return ms.name, version
 
 
-def execute_add(
-    args: argparse.Namespace, *, console: Console | None = None
-) -> int:
+def execute_add(args: argparse.Namespace, *, console: Console | None = None) -> int:
     """Add dependencies to the workspace manifest."""
     if console is None:
         console = Console(highlight=False)
@@ -55,7 +54,10 @@ def execute_add(
 
     n = len(specs)
     noun = "dependency" if n == 1 else "dependencies"
-    console.print(f"Added {n} {label} {noun} to {location} in {manifest_path.name}")
+    console.print(
+        f"{status.DONE} Added {n} {label} {noun}"
+        f" to {location} in {manifest_path.name}"
+    )
     return 0
 
 
@@ -78,8 +80,7 @@ def _add_to_toml(
             entry["features"] = [feature]
             envs[feature] = entry
             console.print(
-                f"Created environment [bold]'{feature}'[/bold]"
-                f" with feature '{feature}'"
+                f"Created environment [bold]'{feature}'[/bold] with feature '{feature}'"
             )
     else:
         target = doc
@@ -116,8 +117,7 @@ def _add_to_pyproject(
             entry["features"] = [feature]
             envs[feature] = entry
             console.print(
-                f"Created environment [bold]'{feature}'[/bold]"
-                f" with feature '{feature}'"
+                f"Created environment [bold]'{feature}'[/bold] with feature '{feature}'"
             )
     else:
         target = source
