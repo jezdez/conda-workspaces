@@ -302,8 +302,8 @@ def test_execute_run_cached_in_dep_chain(tmp_path, capsys, monkeypatch):
     assert "cached" in output
 
 
-def test_execute_run_cached_single_silent(tmp_path, capsys, monkeypatch):
-    """Cached single task (no deps) produces no output."""
+def test_execute_run_cached_single_shows_marker(tmp_path, capsys, monkeypatch):
+    """Cached single task (no deps) shows ○ marker."""
     task_file = tmp_path / "conda.toml"
     task_file.write_text(
         '[tasks.build]\ncmd = "make"\ninputs = ["src/*.py"]\noutputs = ["dist/"]\n'
@@ -315,7 +315,9 @@ def test_execute_run_cached_single_silent(tmp_path, capsys, monkeypatch):
     result = execute_run(_run_args(task_file, task_name="build"))
 
     assert result == 0
-    assert capsys.readouterr().out == ""
+    output = capsys.readouterr().out
+    assert "○" in output
+    assert "cached" in output
 
 
 def test_execute_run_with_cwd_override(tmp_path, capsys, monkeypatch):
