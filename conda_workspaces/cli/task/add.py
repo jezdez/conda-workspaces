@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from rich.console import Console
+
 from ...models import Task, TaskDependency
 from ...parsers import detect_task_file, find_parser
 from ...parsers.toml import CondaTomlParser
@@ -13,8 +15,12 @@ if TYPE_CHECKING:
     import argparse
 
 
-def execute_add(args: argparse.Namespace) -> int:
+def execute_add(
+    args: argparse.Namespace, *, console: Console | None = None
+) -> int:
     """Execute the ``conda task add`` subcommand."""
+    if console is None:
+        console = Console(highlight=False)
     file_path = getattr(args, "file", None)
     if file_path is None:
         file_path = detect_task_file()
@@ -38,10 +44,18 @@ def execute_add(args: argparse.Namespace) -> int:
     quiet = getattr(args, "quiet", False)
 
     if dry_run:
-        print(f"  [dry-run] Would add task '{args.task_name}' to {file_path}")
+        console.print(
+            f"[bold yellow]{'dry-run':<8}[/bold yellow]"
+            f" Would add task [bold]'{args.task_name}'[/bold]"
+            f" to [dim]{file_path}[/dim]"
+        )
         return 0
 
     parser.add_task(file_path, args.task_name, task)
     if not quiet:
-        print(f"  Added task '{args.task_name}' to {file_path}")
+        console.print(
+            f"[bold green]{'added':<8}[/bold green]"
+            f" task [bold]'{args.task_name}'[/bold]"
+            f" to [dim]{file_path}[/dim]"
+        )
     return 0

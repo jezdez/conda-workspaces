@@ -59,13 +59,25 @@ def test_list_json(sample_yaml):
     assert "_setup" not in data["tasks"]
 
 
-def test_list_cmd_as_string(tmp_path):
+def test_list_shows_task_name(tmp_path):
     path = tmp_path / "conda.toml"
     path.write_text('[tasks]\nbuild = "cmake --build ."\n')
 
     console, buf = _make_console()
     execute_list(_list_args(path), console=console)
-    assert "cmake --build ." in buf.getvalue()
+    output = buf.getvalue()
+    assert "build" in output
+    assert "Description" not in output
+
+
+def test_list_shows_description_when_present(tmp_path):
+    path = tmp_path / "conda.toml"
+    path.write_text('[tasks]\nbuild = "make"\n\n[tasks.test]\ncmd = "pytest"\ndescription = "Run tests"\n')
+
+    console, buf = _make_console()
+    execute_list(_list_args(path), console=console)
+    output = buf.getvalue()
+    assert "Run tests" in output
 
 
 def test_list_json_alias(tmp_path):

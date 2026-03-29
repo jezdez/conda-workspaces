@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from rich.console import Console
+
 from ...parsers import detect_and_parse_tasks
 from ...parsers.toml import tasks_to_toml
 
@@ -12,8 +14,12 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def execute_export(args: argparse.Namespace) -> int:
+def execute_export(
+    args: argparse.Namespace, *, console: Console | None = None
+) -> int:
     """Execute the ``conda task export`` subcommand."""
+    if console is None:
+        console = Console(highlight=False)
     file_path = getattr(args, "file", None)
     task_file, tasks = detect_and_parse_tasks(file_path=file_path)
 
@@ -25,7 +31,11 @@ def execute_export(args: argparse.Namespace) -> int:
     if output is not None:
         output.write_text(text, encoding="utf-8")
         if not quiet:
-            print(f"  Exported {len(tasks)} task(s) from {task_file} to {output}")
+            console.print(
+                f"[bold green]{'exported':<8}[/bold green]"
+                f" {len(tasks)} {'task' if len(tasks) == 1 else 'tasks'} from"
+                f" [dim]{task_file}[/dim] to [dim]{output}[/dim]"
+            )
     else:
         print(text, end="")
 

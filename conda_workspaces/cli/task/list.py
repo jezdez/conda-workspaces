@@ -47,26 +47,21 @@ def execute_list(args: argparse.Namespace, *, console: Console | None = None) ->
         console.print(f"No tasks defined in {task_file}")
         return 0
 
-    console.print(f"Tasks from {task_file}:\n")
+    console.print(f"Tasks from {task_file}:")
 
-    table = Table(show_edge=False, pad_edge=False)
-    table.add_column("Name")
-    table.add_column("Command")
-    table.add_column("Description")
-    table.add_column("Dependencies")
+    has_descriptions = any(t.description for t in visible_tasks.values())
+
+    table = Table(show_edge=False, pad_edge=False, show_header=False)
+    table.add_column()
+    if has_descriptions:
+        table.add_column()
 
     for name, task in visible_tasks.items():
-        cmd_str = ""
-        if task.cmd is not None:
-            cmd_str = task.cmd if isinstance(task.cmd, str) else " ".join(task.cmd)
-        elif task.is_alias:
-            cmd_str = "(alias)"
+        if has_descriptions:
+            table.add_row(name, task.description or "")
+        else:
+            table.add_row(name)
 
-        desc = task.description or ""
-        deps = ", ".join(d.task for d in task.depends_on) if task.depends_on else ""
-        table.add_row(name, cmd_str, desc, deps)
-
-    console.print()
     console.print(table)
 
     return 0
