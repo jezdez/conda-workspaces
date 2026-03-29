@@ -1,7 +1,7 @@
 # CI pipeline
 
 This tutorial shows how to use conda-workspaces in GitHub Actions to
-install and test your project.
+install environments, run tasks, and test your project.
 
 ## Basic setup
 
@@ -36,7 +36,7 @@ jobs:
         run: cw install -e test
 
       - name: Run tests
-        run: cw run -e test pytest -v --tb=short
+        run: conda task run -e test check
 ```
 
 ## Caching environments
@@ -70,7 +70,7 @@ jobs:
           miniforge-version: latest
       - run: conda install -c conda-forge conda-workspaces
       - run: cw install -e test
-      - run: cw run -e test pytest -v
+      - run: conda task run -e test check
 
   docs:
     runs-on: ubuntu-latest
@@ -81,16 +81,28 @@ jobs:
           miniforge-version: latest
       - run: conda install -c conda-forge conda-workspaces
       - run: cw install -e docs
-      - run: cw run -e docs sphinx-build docs docs/_build/html
+      - run: conda task run -e docs build-docs
 ```
 
-## With conda-tasks
+## Task caching in CI
 
-If your project also uses [conda-tasks](https://github.com/conda-incubator/conda-tasks)
-for task definitions, you can combine both plugins:
+If your tasks use `inputs`/`outputs` caching, the cache directory can
+be preserved between runs for faster incremental builds:
 
 ```yaml
-      - run: conda install -c conda-forge conda-workspaces conda-tasks
-      - run: cw install -e test
-      - run: cw run -e test conda task run check
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/conda-tasks
+          key: conda-tasks-${{ hashFiles('src/**/*.py') }}
+```
+
+## Tasks without workspaces
+
+If you use conda-workspaces only for task running (no workspace
+definition), your CI setup is simpler — just install dependencies
+manually and run tasks:
+
+```yaml
+      - run: conda install -c conda-forge conda-workspaces pytest ruff
+      - run: conda task run check
 ```

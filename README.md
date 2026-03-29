@@ -3,12 +3,13 @@
 [![License](https://img.shields.io/github/license/conda-incubator/conda-workspaces)](https://github.com/conda-incubator/conda-workspaces/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.14-blue)](https://github.com/conda-incubator/conda-workspaces)
 
-Project-scoped multi-environment workspace management for conda, with pixi
-manifest compatibility.
+Project-scoped multi-environment workspaces and task runner for conda,
+with pixi manifest compatibility.
 
-Define environments in your project manifest, compose them from reusable
-features, and let conda handle the solving and installation. Works with
-existing pixi manifests -- no new package manager required.
+Define environments and tasks in your project manifest, compose
+environments from reusable features, and let conda handle the solving and
+installation. Works with existing pixi manifests -- no new package manager
+required.
 
 ## Quick start
 
@@ -32,27 +33,34 @@ pytest-cov = ">=4.0"
 
 [environments]
 test = { features = ["test"] }
+
+[tasks]
+test = { cmd = "pytest tests/ -v", description = "Run the test suite" }
+lint = "ruff check ."
+
+[tasks.check]
+depends-on = ["test", "lint"]
 ```
 
-Install and manage your environments:
+Install and manage your environments, then run tasks:
 
 ```console
-$ cw install           # solve + install + generate conda.lock
-$ cw run -e test pytest
-$ cw list              # list packages in default env
-$ cw list --envs       # list defined environments
-$ cw install --locked  # reproducible install from conda.lock
+$ cw install              # solve + install + generate conda.lock
+$ cw envs                 # list defined environments
+$ conda task run check    # runs lint and test in dependency order
+$ cw shell -e test        # spawn a shell with test env activated
+$ cw install --locked     # reproducible install from conda.lock
 ```
 
 ## Why?
 
 Conda handles environments and packages. [pixi](https://pixi.sh) introduced
-a great project manifest format with multi-environment workspaces, but it
-brings its own solver and environment management.
+a great project model with multi-environment workspaces and a task runner,
+but it brings its own solver and environment management.
 
 conda-workspaces reads pixi-compatible manifests and delegates solving and
 installation to conda's own infrastructure. You get workspace management
-inside the conda CLI without switching tools.
+and task running inside the conda CLI without switching tools.
 
 ## What it does
 
@@ -65,7 +73,10 @@ inside the conda CLI without switching tools.
 - Activation scripts and environment variables per feature
 - System requirements as virtual package constraints
 - Per-workspace channel priority override
-- Standalone `cw` CLI and `conda workspace` plugin subcommand
+- Task dependencies with topological ordering (`depends-on`)
+- Jinja2 templates in commands (`{{ conda.platform }}`, conditionals)
+- Task arguments with defaults, input/output caching, and per-platform overrides
+- Standalone `cw` / `ct` CLIs and `conda workspace` / `conda task` plugin subcommands
 
 ## Installation
 
@@ -75,8 +86,10 @@ conda install -c conda-forge conda-workspaces
 
 ## CLI
 
-conda-workspaces registers as `conda workspace` and provides `cw` as a
-standalone shortcut.
+conda-workspaces registers as `conda workspace` and `conda task`, and
+provides `cw` and `ct` as standalone shortcuts.
+
+### Workspace commands
 
 | Command | Description |
 |---|---|
@@ -85,25 +98,41 @@ standalone shortcut.
 | `cw install --locked` | Install from lockfile (skip solving) |
 | `cw lock` | Generate/update `conda.lock` |
 | `cw list` | List packages in an environment |
-| `cw list --envs` | List defined environments |
+| `cw envs` | List defined environments |
 | `cw info [ENV]` | Show environment details |
 | `cw add SPECS...` | Add dependencies |
 | `cw remove SPECS...` | Remove dependencies |
-| `cw run [-e ENV] CMD` | Run a task or command in an environment |
 | `cw shell [ENV]` | Spawn a shell with an environment activated |
 | `cw activate [ENV]` | Print activation instructions |
 | `cw clean` | Remove installed environments |
 
+### Task commands
+
+| Command | Description |
+|---|---|
+| `conda task run TASK` | Run a task (with dependency resolution) |
+| `conda task list` | List available tasks |
+| `conda task add NAME CMD` | Add a task to the manifest |
+| `conda task remove NAME` | Remove a task from the manifest |
+| `conda task export` | Export tasks to `conda.toml` format |
+
+The `ct` shortcut works like `conda task`: `ct run check`, `ct list`, etc.
+
 ## What it doesn't do
 
-conda-workspaces is a workspace manager, not a package manager replacement.
-It does not bundle its own solver or bypass conda's installation machinery.
-If you want a fully integrated tool that handles both, see
-[pixi](https://pixi.sh).
+conda-workspaces is a workspace manager and task runner, not a package
+manager replacement. It does not bundle its own solver or bypass conda's
+installation machinery. If you want a fully integrated tool that handles
+everything including its own solver, see [pixi](https://pixi.sh).
 
 ## Documentation
 
 https://conda-incubator.github.io/conda-workspaces/
+
+## Demos
+
+See [demos/README.md](demos/README.md) for animated terminal recordings
+of workspace and task features.
 
 ## Development
 
@@ -115,11 +144,11 @@ pixi run lint
 
 ## Acknowledgements
 
-The workspace and manifest system in conda-workspaces is directly inspired by
+The workspace and task system in conda-workspaces is directly inspired by
 the work of the [prefix.dev](https://prefix.dev) team on
 [pixi](https://github.com/prefix-dev/pixi). Their design of workspace
-manifests, features, environments, and platform targeting provided the blueprint
-for this plugin.
+manifests, features, environments, platform targeting, task dependencies,
+caching, and template variables provided the blueprint for this plugin.
 
 ## License
 

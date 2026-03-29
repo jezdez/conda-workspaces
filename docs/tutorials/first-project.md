@@ -1,7 +1,8 @@
-# Your first workspace
+# Your first project
 
 This tutorial walks through setting up a Python project with separate
-environments for development, testing, and documentation.
+environments for development, testing, and documentation — plus tasks
+to automate your workflow.
 
 ## Prerequisites
 
@@ -91,29 +92,70 @@ This creates three conda environments under `.conda/envs/`:
 └── docs/       # + sphinx, myst-parser
 ```
 
-## Run commands
+## Define tasks
 
-Run your tests:
+Add tasks to your `conda.toml`:
+
+```toml
+[tasks]
+test = { cmd = "pytest tests/ -v", description = "Run the test suite" }
+lint = { cmd = "ruff check src/", description = "Lint the source code" }
+build-docs = { cmd = "sphinx-build docs docs/_build/html", description = "Build documentation" }
+
+[tasks.check]
+depends-on = ["lint", "test"]
+description = "Run all checks"
+```
+
+## Run tasks
+
+List available tasks:
 
 ```bash
-cw run -e test pytest -v
+conda task list
+```
+
+Run a single task in a workspace environment:
+
+```bash
+conda task run -e test test
+```
+
+Run the full check suite:
+
+```bash
+conda task run -e test check
 ```
 
 Build documentation:
 
 ```bash
-cw run -e docs sphinx-build docs docs/_build
+conda task run -e docs build-docs
+```
+
+## Spawn a shell
+
+To drop into an interactive shell with an environment activated:
+
+```bash
+cw shell -e test
+```
+
+Or run a one-shot command:
+
+```bash
+cw shell -e test -- python -c "import numpy; print(numpy.__version__)"
 ```
 
 ## Check environment status
 
 ```bash
-cw list --envs
+cw envs
 cw info -e test
 ```
 
 ## Next steps
 
-- Learn about [features](../features.md) and how environments compose
+- Learn about [features](../features.md) and how environments and tasks compose
 - See the [configuration](../configuration.md) reference for all options
 - Set up [CI pipelines](ci-pipeline.md) with conda-workspaces

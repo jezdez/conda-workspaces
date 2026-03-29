@@ -22,11 +22,35 @@ pixi global install conda-workspaces
 
 ::::
 
+## Your first tasks
+
+![task quickstart demo](../demos/task-quickstart.gif)
+
+Create a `conda.toml` in your project root:
+
+```toml
+[tasks]
+hello = "echo 'Hello from conda-workspaces!'"
+test = { cmd = "pytest tests/ -v", depends-on = ["build"] }
+build = "python -m build"
+```
+
+Run a task:
+
+```bash
+conda task run hello
+conda task run test    # runs build first, then test
+conda task list        # see all tasks
+```
+
+Tasks run in your current conda environment. No workspace definition is
+required — you can start with tasks alone and add workspace features later.
+
 ## Your first workspace
 
 ![quickstart demo](../demos/quickstart.gif)
 
-Create a manifest in your project root:
+Add workspace configuration to the same `conda.toml`:
 
 ::::{tab-set}
 
@@ -159,29 +183,21 @@ freshness:
 cw install --frozen
 ```
 
-## Run tasks or commands
+## Run tasks in workspace environments
+
+Once your workspace is installed, run tasks in specific environments:
 
 ```bash
-cw run -e test pytest -v
+conda task run -e test pytest -v
 ```
 
-When [conda-tasks](https://github.com/conda-incubator/conda-tasks) is
-installed, `cw run` checks for a matching task name first. If no task is
-found, the arguments are executed as a shell command in the environment.
-
-## Spawn a shell
-
-![shell demo](../demos/shell.gif)
-
-To drop into an interactive shell with an environment activated, use
-`cw shell`. This relies on [conda-spawn](https://conda-incubator.github.io/conda-spawn/)
-to start a new shell process — exit with `exit` or Ctrl+D to return.
+Or spawn an interactive shell:
 
 ```bash
 cw shell -e test
 ```
 
-You can also pass a command to run inside the spawned shell:
+You can also pass a one-shot command to `cw shell`:
 
 ```bash
 cw shell -e test -- python -c "import numpy; print(numpy.__version__)"
@@ -205,39 +221,23 @@ Add a PyPI dependency:
 cw add --pypi requests
 ```
 
-## List packages
+## List packages and environments
 
 ```bash
-cw list
-```
-
-This lists packages in the default environment. To list packages in a
-specific environment:
-
-```bash
-cw list -e test
-```
-
-To list defined environments instead:
-
-```bash
-cw list --envs
+cw list              # packages in default env
+cw list -e test      # packages in test env
+cw envs              # list defined environments
 ```
 
 ## Workspace overview
 
 ```bash
 cw info
-```
-
-To see details for a specific environment:
-
-```bash
-cw info -e test
+cw info -e test      # details for a specific environment
 ```
 
 ## Next steps
 
-- Read about [features](features.md) to learn how environments compose
+- Read about [features](features.md) to learn how environments and tasks work
 - See the [configuration](configuration.md) reference for all manifest options
 - Check out the [tutorials](tutorials/index.md) for more in-depth guides

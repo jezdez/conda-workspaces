@@ -8,6 +8,7 @@ api/parsers
 api/resolver
 api/context
 api/environments
+api/execution
 ```
 
 ::::{grid} 2
@@ -17,7 +18,8 @@ api/environments
 :link: api/models
 :link-type: doc
 
-Workspace configuration, features, environments, dependencies, and channels.
+Workspace configuration, task definitions, features, environments,
+dependencies, and channels.
 :::
 
 :::{grid-item-card} Parsers
@@ -38,7 +40,7 @@ Feature-to-environment resolution.
 :link: api/context
 :link-type: doc
 
-Lazy workspace context for conda state and platform introspection.
+Lazy workspace context, template variables, and platform introspection.
 :::
 
 :::{grid-item-card} Environments
@@ -46,6 +48,13 @@ Lazy workspace context for conda state and platform introspection.
 :link-type: doc
 
 Environment creation, removal, and inspection via conda's APIs.
+:::
+
+:::{grid-item-card} Execution
+:link: api/execution
+:link-type: doc
+
+Task DAG resolution, shell backends, caching, and template rendering.
 :::
 
 ::::

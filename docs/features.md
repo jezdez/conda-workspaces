@@ -1,5 +1,193 @@
 # Features
 
+## Tasks
+
+### Task commands
+
+![task quickstart demo](../demos/task-quickstart.gif)
+
+A task's `cmd` can be a simple string or a list of strings joined with
+spaces:
+
+```toml
+[tasks]
+build = "python -m build"
+build-alt = { cmd = ["python", "-m", "build", "--wheel"] }
+```
+
+### Task dependencies
+
+![depends-on demo](../demos/depends-on.gif)
+
+Tasks can depend on other tasks. Dependencies are resolved with
+topological ordering so everything runs in the right sequence:
+
+```toml
+[tasks]
+compile = { cmd = "gcc -o main main.c", description = "Compile the program" }
+test = { cmd = "./main --test", depends-on = ["compile"], description = "Run tests" }
+
+[tasks.check]
+depends-on = ["test", "lint"]
+description = "Run all checks"
+```
+
+Running `conda task run check` resolves the full dependency graph and
+runs each task in order.
+
+### Task aliases
+
+Tasks with no `cmd` that only list dependencies act as aliases:
+
+```toml
+[tasks.check]
+depends-on = ["test", "lint", "typecheck"]
+description = "Run all checks"
+```
+
+### Hidden tasks
+
+Tasks prefixed with `_` are hidden from `conda task list` but can still
+be referenced as dependencies or run explicitly:
+
+```toml
+[tasks]
+_setup = "mkdir -p build/"
+
+[tasks.build]
+cmd = "make"
+depends-on = ["_setup"]
+```
+
+### Task arguments
+
+![templates demo](../demos/templates.gif)
+
+Tasks can accept named arguments with optional defaults:
+
+```toml
+[tasks.test]
+cmd = "pytest {{ test_path }} -v"
+args = [
+  { arg = "test_path", default = "tests/" },
+]
+description = "Run tests on a path"
+```
+
+Run with:
+
+```bash
+conda task run test src/tests/
+```
+
+### Template variables
+
+Commands support Jinja2 templates with `conda.*` context variables:
+
+| Variable | Description |
+|---|---|
+| `{{ conda.platform }}` | Current platform (e.g. `osx-arm64`) |
+| `{{ conda.environment.name }}` | Active environment name |
+| `{{ conda.prefix }}` | `CONDA_PREFIX` path |
+| `{{ conda.version }}` | conda version |
+| `{{ conda.manifest_path }}` | Path to the task file |
+| `{{ conda.init_cwd }}` | CWD when `conda task` was invoked |
+| `{{ conda.is_win }}` | `True` on Windows |
+| `{{ conda.is_unix }}` | `True` on non-Windows |
+| `{{ conda.is_linux }}` | `True` on Linux |
+| `{{ conda.is_osx }}` | `True` on macOS |
+
+When reading from `pixi.toml`, `{{ pixi.platform }}` etc. also work as
+aliases.
+
+### Task environment variables
+
+```toml
+[tasks.test]
+cmd = "pytest"
+env = { PYTHONPATH = "src", DATABASE_URL = "sqlite:///test.db" }
+```
+
+### Clean environment
+
+Run a task with only essential environment variables:
+
+```toml
+[tasks]
+isolated-test = { cmd = "pytest", clean-env = true }
+```
+
+Or via CLI: `conda task run test --clean-env`
+
+### Task caching
+
+![caching demo](../demos/caching.gif)
+
+When `inputs` and `outputs` are specified, tasks are cached and
+re-execution is skipped when inputs haven't changed:
+
+```toml
+[tasks.build]
+cmd = "python -m build"
+inputs = ["src/**/*.py", "pyproject.toml"]
+outputs = ["dist/*.whl"]
+```
+
+:::{tip}
+The cache uses a fast `(mtime, size)` pre-check before falling back to
+SHA-256 hashing, so the overhead on cache hits is minimal.
+:::
+
+### Platform-specific tasks
+
+![platform overrides demo](../demos/platform-overrides.gif)
+
+Override task fields per platform using the `target` key:
+
+::::{tab-set}
+
+:::{tab-item} TOML
+
+```toml
+[tasks]
+clean = "rm -rf build/"
+
+[target.win-64.tasks]
+clean = "rd /s /q build"
+```
+
+:::
+
+:::{tab-item} Jinja2 conditional
+
+```toml
+[tasks]
+clean = "{% if conda.is_win %}rd /s /q build{% else %}rm -rf build/{% endif %}"
+```
+
+:::
+
+::::
+
+### Task environment targeting
+
+Tasks run in your current conda environment by default. When used with
+a workspace, you can target a specific environment:
+
+```bash
+conda task run test -e myenv
+```
+
+Tasks can also declare a default environment:
+
+```toml
+[tasks.test-legacy]
+cmd = "pytest"
+default-environment = "py38-compat"
+```
+
+---
+
 ## Environments
 
 ![multi-env demo](../demos/multi-env.gif)

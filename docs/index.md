@@ -1,12 +1,12 @@
 # conda-workspaces
 
-Project-scoped multi-environment workspace management for conda, with pixi
-manifest compatibility.
+Project-scoped multi-environment workspaces and task runner for conda,
+with pixi manifest compatibility.
 
-Define your environments, features, and dependencies in a single manifest.
+Define environments, features, dependencies, and tasks in a single manifest.
 conda-workspaces reads `conda.toml`, `pixi.toml`, or `pyproject.toml` and
 delegates solving and installation to conda — no extra solver, no new
-package manager, just workspaces on top of the tools you already use.
+package manager, just workspaces and tasks on top of the tools you already use.
 
 ## Install
 
@@ -58,36 +58,60 @@ Then install and use your environments:
 
 ```bash
 cw install                    # solve + install + generate conda.lock
-cw run -e test pytest -v      # run a command in an environment
 cw shell -e test              # spawn a shell with test env activated
 cw install --locked           # reproducible install from conda.lock
 cw list                       # list packages in default env
+cw envs                       # list defined environments
 cw info                       # workspace overview
 ```
 
-Environments are standard conda prefixes stored in `.conda/envs/` inside
-your project directory. They work with `conda activate` and all existing
-conda tooling.
+## Define tasks
+
+![task quickstart demo](../demos/task-quickstart.gif)
+
+Add tasks to the same manifest:
+
+```toml
+[tasks]
+test = { cmd = "pytest tests/ -v", depends-on = ["build"] }
+build = "python -m build"
+lint = "ruff check ."
+
+[tasks.check]
+depends-on = ["test", "lint"]
+```
+
+Then run them:
+
+```bash
+conda task run check        # resolves dependencies, runs build → lint → test
+conda task list             # shows all available tasks
+conda task run test         # builds first, then tests
+```
+
+Tasks run in your current conda environment by default, or target a
+workspace environment with `-e myenv`.
 
 ## Why conda-workspaces?
 
-[pixi](https://pixi.sh) introduced an excellent workspace model for
-managing multi-environment projects, but it brings its own solver and
-installation machinery. conda-workspaces reuses that same manifest format
-while delegating all solving and installation to conda's existing
-infrastructure.
+[pixi](https://pixi.sh) introduced an excellent project model for
+managing multi-environment workspaces and tasks, but it brings its own
+solver and installation machinery. conda-workspaces reuses that same
+manifest format while delegating all solving and installation to conda's
+existing infrastructure.
 
 This means:
 
-- Workspaces read from `pixi.toml`, `conda.toml`, or `pyproject.toml` —
-  one manifest, multiple tools
+- Workspaces and tasks read from `pixi.toml`, `conda.toml`, or
+  `pyproject.toml` — one manifest, multiple tools
 - Environments are solved by conda / libmamba and installed as regular
   conda prefixes
 - Lock files (`conda.lock`) capture exact package URLs for reproducible
   installs without re-solving
-- Composable features, platform overrides, and PyPI
-  dependencies all work out of the box
-- Ships as a conda plugin (`conda workspace`) and a standalone `cw` CLI
+- Task dependencies, caching, Jinja2 templates, and platform overrides
+  all work out of the box
+- Ships as a conda plugin (`conda workspace`, `conda task`) and
+  standalone `cw` / `ct` CLIs
 
 Read more in [](motivation.md).
 
@@ -100,14 +124,14 @@ Read more in [](motivation.md).
 :link: quickstart
 :link-type: doc
 
-Set up your first workspace in under a minute.
+Set up your first workspace and tasks in under a minute.
 :::
 
 :::{grid-item-card} {octicon}`mortar-board` Tutorials
 :link: tutorials/index
 :link-type: doc
 
-Step-by-step guides: your first workspace, migrating from pixi, CI setup.
+Step-by-step guides: your first project, migrating from pixi, CI setup.
 :::
 
 :::{grid-item-card} {octicon}`list-unordered` Features
@@ -115,7 +139,7 @@ Step-by-step guides: your first workspace, migrating from pixi, CI setup.
 :link-type: doc
 
 Environments, features, platform overrides, PyPI dependencies,
-and more.
+task dependencies, caching, templates, and more.
 :::
 
 :::{grid-item-card} {octicon}`gear` Configuration
@@ -130,14 +154,15 @@ All manifest fields and file formats (`conda.toml`, `pixi.toml`,
 :link: reference/cli
 :link-type: doc
 
-Complete `conda workspace` command-line documentation.
+Complete `conda workspace` and `conda task` command-line documentation.
 :::
 
 :::{grid-item-card} {octicon}`code` API reference
 :link: reference/api
 :link-type: doc
 
-Python API for models, parsers, resolver, context, and environments.
+Python API for models, parsers, resolver, context, environments,
+and task execution.
 :::
 
 ::::

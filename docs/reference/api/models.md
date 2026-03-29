@@ -1,6 +1,6 @@
 # Models and exceptions
 
-Workspace configuration data models and the errors they can raise.
+Workspace configuration, task definitions, and the errors they can raise.
 
 ```{eval-rst}
 .. automodule:: conda_workspaces.models
