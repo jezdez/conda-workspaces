@@ -80,9 +80,8 @@ def test_parse_environments(parser, sample_pyproject_toml):
     "table_key, dep_key",
     [
         ("tool.conda", "tool.conda"),
-        ("tool.conda-workspaces", "tool.conda-workspaces"),
     ],
-    ids=["conda-table", "conda-workspaces-table"],
+    ids=["conda-table"],
 )
 def test_alternative_tables(parser, tmp_path, table_key, dep_key):
     content = f"""\

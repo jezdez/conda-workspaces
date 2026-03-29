@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-pytest_plugins = ["conda.testing.fixtures"]
+pytest_plugins = ["conda.testing", "conda.testing.fixtures"]
 
 from contextlib import ExitStack
 from typing import TYPE_CHECKING, Protocol
@@ -14,6 +14,9 @@ from conda_workspaces.models import (
     Environment,
     Feature,
     MatchSpec,
+    Task,
+    TaskDependency,
+    TaskOverride,
     WorkspaceConfig,
 )
 
@@ -155,3 +158,92 @@ def tmp_workspace_env(tmp_env: TmpEnvFixture) -> Iterator[CreateWorkspaceEnv]:
 
     with stack:
         yield _create
+
+
+@pytest.fixture
+def tmp_project(tmp_path: Path) -> Path:
+    """A temporary directory acting as a project root."""
+    return tmp_path
+
+
+@pytest.fixture
+def sample_yaml(tmp_project: Path) -> Path:
+    """Create a sample conda.toml for task testing (legacy fixture name)."""
+    content = """\
+[tasks]
+lint = "ruff check ."
+_setup = "mkdir -p build/"
+platform-task = "rm -rf build/"
+
+[tasks.build]
+cmd = "make build"
+depends-on = ["configure"]
+description = "Build the project"
+inputs = ["src/**/*.py"]
+outputs = ["dist/"]
+
+[tasks.configure]
+cmd = "cmake -G Ninja -S . -B .build"
+description = "Configure build system"
+
+[tasks.test]
+cmd = "pytest {{ test_path }}"
+env = { PYTHONPATH = "src" }
+clean-env = true
+args = [{ arg = "test_path", default = "tests/" }]
+
+[tasks.check]
+depends-on = ["test", "lint"]
+description = "Run all checks"
+
+[target.win-64.tasks]
+platform-task = "rd /s /q build"
+"""
+    path = tmp_project / "conda.toml"
+    path.write_text(content)
+    return path
+
+
+@pytest.fixture
+def simple_task() -> Task:
+    return Task(name="build", cmd="make build", description="Build it")
+
+
+@pytest.fixture
+def task_with_deps() -> dict[str, Task]:
+    return {
+        "configure": Task(name="configure", cmd="cmake ."),
+        "build": Task(
+            name="build",
+            cmd="make",
+            depends_on=[TaskDependency(task="configure")],
+        ),
+        "test": Task(
+            name="test",
+            cmd="pytest",
+            depends_on=[TaskDependency(task="build")],
+        ),
+    }
+
+
+@pytest.fixture
+def task_with_overrides() -> Task:
+    return Task(
+        name="clean",
+        cmd="rm -rf build/",
+        platforms={
+            "win-64": TaskOverride(cmd="rd /s /q build"),
+            "osx-arm64": TaskOverride(env={"MACOSX_DEPLOYMENT_TARGET": "11.0"}),
+        },
+    )
+
+
+@pytest.fixture
+def alias_task() -> Task:
+    return Task(
+        name="check",
+        depends_on=[
+            TaskDependency(task="test"),
+            TaskDependency(task="lint"),
+        ],
+    )

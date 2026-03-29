@@ -54,11 +54,6 @@ def lockfile_path(ctx: WorkspaceContext) -> Path:
     return ctx.root / LOCKFILE_NAME
 
 
-def lockfile_exists(ctx: WorkspaceContext) -> bool:
-    """Check whether a lockfile exists for the workspace."""
-    return lockfile_path(ctx).is_file()
-
-
 def _build_lockfile_dict(
     environments: dict[tuple[str, str], list],
     channels_by_env: dict[str, list[str]],

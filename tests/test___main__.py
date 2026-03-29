@@ -1,10 +1,10 @@
-"""Tests for conda_workspaces.__main__ (``cw`` entry point)."""
+"""Tests for conda_workspaces.__main__ (``cw`` and ``ct`` entry points)."""
 
 from __future__ import annotations
 
 import pytest
 
-from conda_workspaces.__main__ import main
+from conda_workspaces.__main__ import main, main_task
 from conda_workspaces.cli import main as cli_main_mod
 
 
@@ -23,24 +23,48 @@ class _FakeParser:
         return NS()
 
 
-def test_main_no_args_shows_help(capsys: pytest.CaptureFixture[str]) -> None:
-    """Calling main() with no arguments should print help and exit."""
+def test_main_no_args_shows_help() -> None:
     with pytest.raises(SystemExit):
         main([])
 
 
+def test_main_task_no_args_shows_help() -> None:
+    with pytest.raises(SystemExit):
+        main_task([])
+
+
 def test_main_sets_prog_to_cw(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Parser.prog should be 'cw', not 'conda workspace'."""
     fake_parser = _FakeParser()
 
-    monkeypatch.setattr(cli_main_mod, "generate_parser", lambda: fake_parser)
-    monkeypatch.setattr(cli_main_mod, "execute", lambda parsed: 0)
+    monkeypatch.setattr(
+        cli_main_mod, "generate_workspace_parser", lambda: fake_parser
+    )
+    monkeypatch.setattr(
+        cli_main_mod, "execute_workspace", lambda parsed: 0
+    )
 
     with pytest.raises(SystemExit) as exc_info:
         main([])
 
     assert exc_info.value.code == 0
     assert fake_parser.captured_prog == ["cw"]
+
+
+def test_main_task_sets_prog_to_ct(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_parser = _FakeParser()
+
+    monkeypatch.setattr(
+        cli_main_mod, "generate_task_parser", lambda: fake_parser
+    )
+    monkeypatch.setattr(
+        cli_main_mod, "execute_task", lambda parsed: 0
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        main_task([])
+
+    assert exc_info.value.code == 0
+    assert fake_parser.captured_prog == ["ct"]
 
 
 @pytest.mark.parametrize(
@@ -51,11 +75,14 @@ def test_main_sets_prog_to_cw(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_main_exits_with_execute_return_code(
     monkeypatch: pytest.MonkeyPatch, exit_code: int
 ) -> None:
-    """main() should SystemExit with whatever execute() returns."""
     fake_parser = _FakeParser()
 
-    monkeypatch.setattr(cli_main_mod, "generate_parser", lambda: fake_parser)
-    monkeypatch.setattr(cli_main_mod, "execute", lambda parsed: exit_code)
+    monkeypatch.setattr(
+        cli_main_mod, "generate_workspace_parser", lambda: fake_parser
+    )
+    monkeypatch.setattr(
+        cli_main_mod, "execute_workspace", lambda parsed: exit_code
+    )
 
     with pytest.raises(SystemExit) as exc_info:
         main([])

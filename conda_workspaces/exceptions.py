@@ -80,13 +80,6 @@ class FeatureNotFoundError(CondaWorkspacesError):
         )
 
 
-class ChannelError(CondaWorkspacesError):
-    """Channel configuration error."""
-
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-
-
 class PlatformError(CondaWorkspacesError):
     """Platform configuration error."""
 
@@ -141,4 +134,47 @@ class LockfileStaleError(CondaWorkspacesError):
             f"(manifest '{manifest}' has been modified since the last lock).\n"
             "Run 'conda workspace lock' to update it, "
             "or use --frozen to install anyway."
+        )
+
+
+class TaskNotFoundError(CondaWorkspacesError):
+    """Raised when a referenced task does not exist."""
+
+    def __init__(self, task_name: str, available: list[str] | None = None):
+        msg = f"Task '{task_name}' not found."
+        if available:
+            msg += f" Available tasks: {', '.join(sorted(available))}"
+        super().__init__(msg)
+
+
+class CyclicDependencyError(CondaWorkspacesError):
+    """Raised when the task dependency graph contains a cycle."""
+
+    def __init__(self, cycle: list[str]):
+        path = " -> ".join(cycle)
+        super().__init__(f"Cyclic dependency detected: {path}")
+
+
+class TaskParseError(CondaWorkspacesError):
+    """Raised when a task definition file cannot be parsed."""
+
+    def __init__(self, path: str, reason: str):
+        super().__init__(f"Failed to parse '{path}': {reason}")
+
+
+class TaskExecutionError(CondaWorkspacesError):
+    """Raised when a task command exits with a non-zero status."""
+
+    def __init__(self, task_name: str, exit_code: int):
+        super().__init__(f"Task '{task_name}' failed with exit code {exit_code}")
+
+
+class NoTaskFileError(CondaWorkspacesError):
+    """Raised when no task definition file is found."""
+
+    def __init__(self, search_dir: str):
+        super().__init__(
+            f"No task file found in '{search_dir}'. "
+            "Create a conda.toml, pixi.toml, or pyproject.toml "
+            "with task definitions."
         )

@@ -19,7 +19,6 @@ from conda_workspaces.lockfile import (
     _record_to_dict,
     generate_lockfile,
     install_from_lockfile,
-    lockfile_exists,
     lockfile_path,
 )
 from conda_workspaces.models import Channel, Environment, Feature, WorkspaceConfig
@@ -51,21 +50,6 @@ def _make_ctx(
 def test_lockfile_path_returns_conda_lock(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
     assert lockfile_path(ctx) == tmp_path / LOCKFILE_NAME
-
-
-@pytest.mark.parametrize(
-    "create_file, expected",
-    [
-        (False, False),
-        (True, True),
-    ],
-    ids=["missing", "present"],
-)
-def test_lockfile_exists(tmp_path: Path, create_file: bool, expected: bool) -> None:
-    ctx = _make_ctx(tmp_path)
-    if create_file:
-        (tmp_path / LOCKFILE_NAME).write_text("version: 1\n", encoding="utf-8")
-    assert lockfile_exists(ctx) is expected
 
 
 def test_record_to_dict(monkeypatch: pytest.MonkeyPatch) -> None:

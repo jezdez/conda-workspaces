@@ -9,7 +9,6 @@ from conda.exceptions import CondaError
 
 from conda_workspaces.exceptions import (
     ActivationError,
-    ChannelError,
     CondaWorkspacesError,
     EnvironmentNotFoundError,
     EnvironmentNotInstalledError,
@@ -55,10 +54,6 @@ from conda_workspaces.exceptions import (
             ["test"],
         ),
         (
-            ChannelError("bad channel config"),
-            ["bad channel config"],
-        ),
-        (
             ActivationError("dev", "shell not found"),
             ["dev", "shell not found"],
         ),
@@ -83,7 +78,6 @@ from conda_workspaces.exceptions import (
         "feature-not-found",
         "platform-error",
         "solve-error",
-        "channel-error",
         "activation-error",
         "lockfile-not-found",
         "env-not-installed",

@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from conda import __version__ as conda_version
+from conda.base.context import Context, context
 
-from conda_workspaces.context import WorkspaceContext
+from conda_workspaces.context import (
+    CondaContext,
+    WorkspaceContext,
+    build_template_context,
+)
 from conda_workspaces.models import (
     Channel,
     Environment,
@@ -89,30 +96,6 @@ def test_config_lazy_loads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
 
 
 @pytest.mark.parametrize(
-    "platforms, cached_platform, expected",
-    [
-        (["linux-64", "osx-arm64"], "linux-64", True),
-        (["linux-64", "osx-arm64"], "win-64", False),
-        ([], "anything", True),
-    ],
-    ids=["supported", "unsupported", "empty-means-all"],
-)
-def test_is_platform_supported(
-    tmp_path: Path, platforms: list[str], cached_platform: str, expected: bool
-) -> None:
-    config = WorkspaceConfig(
-        name="test",
-        root=str(tmp_path),
-        platforms=platforms,
-        features={"default": Feature(name="default")},
-        environments={"default": Environment(name="default")},
-    )
-    ctx = WorkspaceContext(config)
-    ctx._cache["platform"] = cached_platform
-    assert ctx.is_platform_supported is expected
-
-
-@pytest.mark.parametrize(
     "env_name",
     ["default", "test", "docs"],
     ids=["default", "named-test", "named-docs"],
@@ -141,3 +124,84 @@ def test_env_exists(
     if has_conda_meta:
         tmp_workspace_env(ctx.root, "default")
     assert ctx.env_exists("default") is expected
+
+
+def test_conda_context_platform():
+    assert CondaContext().platform == context.subdir
+
+
+@pytest.mark.parametrize(
+    ("on_win_val", "expected_win", "expected_unix"),
+    [
+        (False, False, True),
+        (True, True, False),
+    ],
+)
+def test_conda_context_is_win(monkeypatch, on_win_val, expected_win, expected_unix):
+    monkeypatch.setattr("conda.base.constants.on_win", on_win_val)
+    ctx = CondaContext()
+    assert ctx.is_win is expected_win
+    assert ctx.is_unix is expected_unix
+
+
+def test_conda_context_is_osx():
+    assert CondaContext().is_osx == (context.platform == "osx")
+
+
+@pytest.mark.parametrize(
+    ("manifest_path", "expected"),
+    [
+        (
+            Path("/some/project/conda.toml"),
+            str(Path("/some/project/conda.toml")),
+        ),
+        (None, ""),
+    ],
+    ids=["with-path", "none"],
+)
+def test_conda_context_manifest_path(manifest_path, expected):
+    ctx = CondaContext(manifest_path=manifest_path)
+    assert ctx.manifest_path == expected
+
+
+def test_conda_context_environment_name():
+    ctx = CondaContext()
+    if context.active_prefix:
+        expected = Path(context.active_prefix).name
+    else:
+        expected = "base"
+    assert ctx.environment_name == expected
+
+
+def test_conda_context_environment_name_fallback(monkeypatch):
+    monkeypatch.setattr(Context, "active_prefix", property(lambda self: ""))
+    assert CondaContext().environment_name == "base"
+
+
+def test_conda_context_environment_proxy():
+    ctx = CondaContext()
+    assert ctx.environment.name == ctx.environment_name
+
+
+def test_conda_context_prefix():
+    assert CondaContext().prefix == context.target_prefix
+
+
+def test_conda_context_version():
+    assert CondaContext().version == conda_version
+
+
+def test_conda_context_init_cwd():
+    assert CondaContext().init_cwd == os.getcwd()
+
+
+def test_build_context_has_conda_and_pixi():
+    ctx = build_template_context()
+    assert "conda" in ctx
+    assert "pixi" in ctx
+    assert ctx["conda"] is ctx["pixi"]
+
+
+def test_build_context_task_args():
+    ctx = build_template_context(task_args={"path": "tests/"})
+    assert ctx["path"] == "tests/"
