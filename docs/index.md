@@ -48,8 +48,8 @@ numpy = ">=1.24"
 pytest = ">=8.0"
 
 [environments]
-default = { solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
+default = []
+test = { features = ["test"] }
 ```
 
 Then install and use your environments:
@@ -83,7 +83,7 @@ This means:
   conda prefixes
 - Lock files (`conda.lock`) capture exact package URLs for reproducible
   installs without re-solving
-- Composable features, solve-groups, platform overrides, and PyPI
+- Composable features, platform overrides, and PyPI
   dependencies all work out of the box
 - Ships as a conda plugin (`conda workspace`) and a standalone `cw` CLI
 
@@ -112,7 +112,7 @@ Step-by-step guides: your first workspace, migrating from pixi, CI setup.
 :link: features
 :link-type: doc
 
-Environments, features, solve-groups, platform overrides, PyPI dependencies,
+Environments, features, platform overrides, PyPI dependencies,
 and more.
 :::
 

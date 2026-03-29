@@ -7,14 +7,21 @@ Each environment is installed under `.conda/envs/<name>/` in your project.
 
 ```toml
 [environments]
-default = { solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
+default = []
+test = { features = ["test"] }
 docs = { features = ["docs"] }
 ```
 
 The `default` environment always exists and includes the top-level
 `[dependencies]`. Named environments inherit the default feature unless
 `no-default-feature = true` is set.
+
+:::{note}
+Pixi's `solve-group` key is accepted in manifests for compatibility but
+has no effect. Conda's solver operates on a single environment at a time
+and does not support cross-environment version coordination. Each
+environment is solved independently.
+:::
 
 ## Features
 
@@ -71,23 +78,6 @@ llvm-openmp = ">=14.0"
 Platform overrides are merged on top of the base dependencies when
 resolving for a specific platform.
 
-## Solve-groups
-
-Solve-groups coordinate dependency versions across related environments.
-Environments in the same group are solved together to ensure consistent
-package versions:
-
-```toml
-[environments]
-default = { solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
-docs = { features = ["docs"] }
-```
-
-Here, `default` and `test` share the `"default"` solve-group, so they
-will have identical versions for shared packages. The `docs` environment
-is solved independently.
-
 ## PyPI dependencies
 
 PyPI dependencies are specified separately from conda dependencies:
@@ -101,9 +91,26 @@ some-pypi-only = ">=1.0"
 pytest-benchmark = ">=4.0"
 ```
 
-PyPI dependencies are parsed and stored in the model. Installation
-requires [conda-pypi](https://github.com/conda-incubator/conda-pypi)
-to be available.
+PyPI package names are translated to their conda equivalents (via the
+[grayskull mapping](https://github.com/conda/grayskull)) and merged
+into the same solver call as conda dependencies. This means the rattler
+solver resolves conda and PyPI packages together in a single pass, and
+`conda-pypi`'s wheel extractor handles `.whl` installation.
+
+To use PyPI dependencies you need:
+
+- [conda-pypi](https://github.com/conda/conda-pypi) for name mapping
+  and wheel extraction
+- [conda-rattler-solver](https://github.com/conda-incubator/conda-rattler-solver)
+  as the solver backend
+- A channel that indexes PyPI wheels (e.g. the
+  [conda-pypi-test](https://github.com/conda-incubator/conda-pypi-test)
+  channel for development)
+
+Editable, git, and URL dependencies (e.g. `path = "."`, `git = "..."`)
+are handled separately via `conda-pypi`'s build system after the main
+solve completes. If `conda-pypi` is not installed, PyPI dependencies
+are skipped with a warning.
 
 ## No-default-feature
 
@@ -131,14 +138,9 @@ env = { DEBUG = "1" }
 ```
 
 Activation settings are merged across features when composing an
-environment.
-
-:::{note}
-Activation scripts and environment variables are parsed from the manifest
-and stored in the resolved environment model, but are not yet applied
-automatically during `cw run` or `cw shell`. Use `conda activate` for
-full activation support.
-:::
+environment. After `cw install`, environment variables are written to
+the prefix state file (available via `conda activate`) and activation
+scripts are copied to `$PREFIX/etc/conda/activate.d/`.
 
 ## System requirements
 
@@ -150,11 +152,24 @@ cuda = "12"
 glibc = "2.17"
 ```
 
-:::{note}
-System requirements are parsed and stored but not yet enforced during
-environment creation. They serve as documentation and will be validated
-in a future release.
-:::
+System requirements are added as virtual package constraints
+(`__cuda >=12`, `__glibc >=2.17`) during environment solving. This
+ensures the solver only picks packages compatible with the declared
+system capabilities.
+
+## Channel priority
+
+The workspace-level `channel-priority` setting overrides conda's global
+channel priority during solving:
+
+```toml
+[workspace]
+channels = ["conda-forge"]
+channel-priority = "strict"
+```
+
+Valid values are `strict`, `flexible`, and `disabled`. When not set,
+conda's default channel priority applies.
 
 ## Lock
 

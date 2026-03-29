@@ -1,6 +1,6 @@
 # Resolver
 
-Feature-to-environment resolution and solve-group coordination.
+Feature-to-environment resolution.
 
 ```{eval-rst}
 .. automodule:: conda_workspaces.resolver

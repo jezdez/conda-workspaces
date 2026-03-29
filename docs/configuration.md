@@ -38,8 +38,8 @@ sphinx = ">=7.0"
 myst-parser = ">=3.0"
 
 [environments]
-default = { solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
+default = []
+test = { features = ["test"] }
 docs = { features = ["docs"] }
 
 [target.linux-64.dependencies]
@@ -69,8 +69,8 @@ numpy = ">=1.24"
 pytest = ">=8.0"
 
 [environments]
-default = { solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
+default = []
+test = { features = ["test"] }
 ```
 
 The legacy `[project]` table is also accepted (pre-workspace pixi
@@ -99,8 +99,8 @@ numpy = ">=1.24"
 pytest = ">=8.0"
 
 [tool.conda.environments]
-default = { solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
+default = []
+test = { features = ["test"] }
 ```
 
 :::
@@ -120,8 +120,8 @@ python = ">=3.10"
 pytest = ">=8.0"
 
 [tool.pixi.environments]
-default = { solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
+default = []
+test = { features = ["test"] }
 ```
 
 :::
@@ -174,7 +174,6 @@ Each entry in `[environments]` defines a named environment:
 | Field | Type | Description |
 |---|---|---|
 | `features` | list of strings | Features to include (in addition to default) |
-| `solve-group` | string | Solve-group for version coordination |
 | `no-default-feature` | bool | Exclude the default feature (default: false) |
 
 Shorthand forms are supported:
@@ -182,11 +181,11 @@ Shorthand forms are supported:
 ```toml
 [environments]
 # Full form
-test = { features = ["test"], solve-group = "default" }
+test = { features = ["test"] }
 
 # Features only
 lint = ["lint"]
 
-# Solve-group only
-default = { solve-group = "default" }
+# Default environment shorthand
+default = []
 ```

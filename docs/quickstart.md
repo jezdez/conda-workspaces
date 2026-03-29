@@ -45,8 +45,8 @@ pytest = ">=8.0"
 pytest-cov = ">=4.0"
 
 [environments]
-default = { solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
+default = []
+test = { features = ["test"] }
 ```
 
 :::
@@ -68,8 +68,8 @@ pytest = ">=8.0"
 pytest-cov = ">=4.0"
 
 [environments]
-default = { solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
+default = []
+test = { features = ["test"] }
 ```
 
 :::
@@ -91,8 +91,8 @@ pytest = ">=8.0"
 pytest-cov = ">=4.0"
 
 [tool.conda.environments]
-default = { solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
+default = []
+test = { features = ["test"] }
 ```
 
 :::

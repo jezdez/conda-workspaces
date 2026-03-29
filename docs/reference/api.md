@@ -31,7 +31,7 @@ File format parsers, detection logic, and the parser registry.
 :link: api/resolver
 :link-type: doc
 
-Feature-to-environment resolution and solve-group coordination.
+Feature-to-environment resolution.
 :::
 
 :::{grid-item-card} Context

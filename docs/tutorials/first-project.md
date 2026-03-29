@@ -71,8 +71,8 @@ sphinx = ">=7.0"
 myst-parser = ">=3.0"
 
 [environments]
-default = { solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
+default = []
+test = { features = ["test"] }
 docs = { features = ["docs"] }
 ```
 
