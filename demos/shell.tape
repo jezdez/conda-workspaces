@@ -62,7 +62,7 @@ Type "# Or run a one-shot command"
 Enter
 Sleep 500ms
 
-Type@80ms `conda workspace run -e default python -c "print('Hello from the workspace!')"`
+Type@80ms `conda workspace shell -e default -- python -c "print('Hello from the workspace!')"`
 Enter
 Wait /\$/
 Sleep 3s

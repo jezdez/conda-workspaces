@@ -4,13 +4,32 @@ Animated terminal demos recorded with [VHS](https://github.com/charmbracelet/vhs
 
 ## Demos
 
+### Workspaces
+
 | Demo | Description |
 |---|---|
-| `quickstart` | Init a workspace, add deps, install, list, run |
+| `quickstart` | Init a workspace, add deps, install, list envs, run a command |
 | `lockfile` | Install, lock, clean, reinstall from lockfile |
 | `multi-env` | Multiple environments from one manifest |
 | `pixi-compat` | Use an existing pixi.toml with conda-workspaces |
 | `shell` | Interactive shell and one-shot commands |
+
+### Tasks
+
+| Demo | Description |
+|---|---|
+| `task-quickstart` | Define tasks, list, and run them |
+| `depends-on` | Task dependencies and --skip-deps |
+| `caching` | Input/output caching for incremental builds |
+| `templates` | Jinja2 templates and task arguments |
+| `platform-overrides` | Platform-specific task overrides |
+| `task-pixi-compat` | Read pixi.toml tasks and export to conda.toml |
+
+### Ecosystem
+
+| Demo | Description |
+|---|---|
+| `ecosystem` | Workspace environments + tasks in one manifest |
 
 ## Prerequisites
 

@@ -51,7 +51,7 @@ Enter
 Wait /\$/
 Sleep 2s
 
-Type@80ms "conda workspace run -e test pytest --version"
+Type@80ms "conda workspace shell -e test -- pytest --version"
 Enter
 Wait /\$/
 Sleep 3s

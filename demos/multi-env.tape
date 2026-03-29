@@ -42,7 +42,7 @@ Enter
 Wait /\$/
 Sleep 2s
 
-Type@80ms "conda workspace list --envs"
+Type@80ms "conda workspace envs"
 Enter
 Wait /\$/
 Sleep 2s
@@ -65,7 +65,7 @@ Type "# Run tools in the right environment"
 Enter
 Sleep 500ms
 
-Type@80ms "conda workspace run -e lint ruff --version"
+Type@80ms "conda workspace shell -e lint -- ruff --version"
 Enter
 Wait /\$/
 Sleep 3s

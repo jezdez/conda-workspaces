@@ -59,7 +59,7 @@ Type "# See what we built"
 Enter
 Sleep 500ms
 
-Type@80ms "conda workspace list --envs"
+Type@80ms "conda workspace envs"
 Enter
 Wait /\$/
 Sleep 2s
@@ -68,7 +68,7 @@ Type "# Run a command in the test environment"
 Enter
 Sleep 500ms
 
-Type@80ms `conda workspace run -e test python -c "import numpy; print(numpy.__version__)"`
+Type@80ms `conda workspace shell -e test -- python -c "import numpy; print(numpy.__version__)"`
 Enter
 Wait /\$/
 Sleep 3s
