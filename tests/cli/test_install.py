@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
 import pytest
 
 from conda_workspaces.cli.install import execute_install
+from conda_workspaces.exceptions import LockfileStaleError
 
 from .conftest import make_args
 
@@ -100,7 +102,9 @@ def test_install_flags_forwarded(
         "conda_workspaces.cli.install.install_environment", fake_install
     )
 
-    args = make_args(_DEFAULTS, environment="default", force_reinstall=force, dry_run=dry_run)
+    args = make_args(
+        _DEFAULTS, environment="default", force_reinstall=force, dry_run=dry_run,
+    )
     execute_install(args)
     assert recorded[0] == (force, dry_run)
 
@@ -163,10 +167,6 @@ def test_install_locked_validates_freshness(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """--locked fails when lockfile is older than the manifest."""
-    import time
-
-    from conda_workspaces.exceptions import LockfileStaleError
-
     monkeypatch.chdir(pixi_workspace)
 
     lock_file = pixi_workspace / "conda.lock"

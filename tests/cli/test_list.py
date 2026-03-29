@@ -3,16 +3,22 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
 from conda_workspaces.cli.list import execute_list
+from conda_workspaces.exceptions import (
+    EnvironmentNotFoundError,
+    EnvironmentNotInstalledError,
+)
 
 from .conftest import make_args
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from rich.console import Console
 
     from tests.conftest import CreateWorkspaceEnv
 
@@ -28,13 +34,13 @@ _DEFAULTS = {
 def test_list_all_environments(
     pixi_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+    rich_console: Console,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    args = make_args(_DEFAULTS,envs=True)
-    result = execute_list(args)
+    args = make_args(_DEFAULTS, envs=True)
+    result = execute_list(args, console=rich_console)
     assert result == 0
-    out = capsys.readouterr().out
+    out = rich_console.file.getvalue()
     assert "default" in out
     assert "test" in out
 
@@ -42,28 +48,28 @@ def test_list_all_environments(
 def test_list_installed_only(
     pixi_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+    rich_console: Console,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    args = make_args(_DEFAULTS,envs=True, installed=True)
-    result = execute_list(args)
+    args = make_args(_DEFAULTS, envs=True, installed=True)
+    result = execute_list(args, console=rich_console)
     assert result == 0
-    out = capsys.readouterr().out
+    out = rich_console.file.getvalue()
     assert "No environments found" in out
 
 
 def test_list_installed_with_env(
     pixi_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+    rich_console: Console,
     tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
     tmp_workspace_env(pixi_workspace, "default")
 
-    args = make_args(_DEFAULTS,envs=True, installed=True)
-    execute_list(args)
-    out = capsys.readouterr().out
+    args = make_args(_DEFAULTS, envs=True, installed=True)
+    execute_list(args, console=rich_console)
+    out = rich_console.file.getvalue()
     assert "default" in out
     assert "test" not in out
 
@@ -71,12 +77,12 @@ def test_list_installed_with_env(
 def test_list_json_output(
     pixi_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+    rich_console: Console,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    args = make_args(_DEFAULTS,envs=True, json=True)
-    execute_list(args)
-    out = capsys.readouterr().out
+    args = make_args(_DEFAULTS, envs=True, json=True)
+    execute_list(args, console=rich_console)
+    out = rich_console.file.getvalue()
     data = json.loads(out)
     assert isinstance(data, list)
     names = {row["name"] for row in data}
@@ -89,8 +95,6 @@ def test_list_packages_not_installed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Default list (packages) raises when the env is not installed."""
-    from conda_workspaces.exceptions import EnvironmentNotInstalledError
-
     monkeypatch.chdir(pixi_workspace)
 
     with pytest.raises(EnvironmentNotInstalledError):
@@ -101,18 +105,15 @@ def test_list_packages_undefined_env(
     pixi_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from conda_workspaces.exceptions import EnvironmentNotFoundError
-
     monkeypatch.chdir(pixi_workspace)
 
     with pytest.raises(EnvironmentNotFoundError):
-        execute_list(make_args(_DEFAULTS,environment="nonexistent"))
+        execute_list(make_args(_DEFAULTS, environment="nonexistent"))
 
 
 @pytest.fixture
 def _stub_prefix_data(monkeypatch: pytest.MonkeyPatch) -> None:
     """Stub PrefixData so _list_packages doesn't need real conda-meta."""
-    from dataclasses import dataclass
 
     @dataclass
     class FakeRecord:
@@ -130,15 +131,13 @@ def _stub_prefix_data(monkeypatch: pytest.MonkeyPatch) -> None:
             self._prefix = prefix
 
         def is_environment(self) -> bool:
-            from pathlib import Path
-
             return (Path(self._prefix) / "conda-meta").is_dir()
 
         def iter_records(self):
             return iter(records)
 
     monkeypatch.setattr(
-        "conda.core.envs_manager.PrefixData", FakePrefixData
+        "conda_workspaces.cli.list.PrefixData", FakePrefixData
     )
 
 
@@ -150,7 +149,7 @@ def _stub_prefix_data(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_list_packages(
     pixi_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+    rich_console: Console,
     tmp_workspace_env: CreateWorkspaceEnv,
     _stub_prefix_data: None,
     json_flag: bool,
@@ -158,10 +157,10 @@ def test_list_packages(
     monkeypatch.chdir(pixi_workspace)
     tmp_workspace_env(pixi_workspace, "default")
 
-    args = make_args(_DEFAULTS,json=json_flag)
-    result = execute_list(args)
+    args = make_args(_DEFAULTS, json=json_flag)
+    result = execute_list(args, console=rich_console)
     assert result == 0
-    out = capsys.readouterr().out
+    out = rich_console.file.getvalue()
 
     if json_flag:
         data = json.loads(out)
@@ -177,7 +176,7 @@ def test_list_packages(
 def test_list_packages_empty(
     pixi_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+    rich_console: Console,
     tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
@@ -188,18 +187,16 @@ def test_list_packages_empty(
             self._prefix = prefix
 
         def is_environment(self) -> bool:
-            from pathlib import Path
-
             return (Path(self._prefix) / "conda-meta").is_dir()
 
         def iter_records(self):
             return iter([])
 
     monkeypatch.setattr(
-        "conda.core.envs_manager.PrefixData", EmptyPrefixData
+        "conda_workspaces.cli.list.PrefixData", EmptyPrefixData
     )
 
     args = make_args(_DEFAULTS)
-    result = execute_list(args)
+    result = execute_list(args, console=rich_console)
     assert result == 0
-    assert "No packages installed" in capsys.readouterr().out
+    assert "No packages installed" in rich_console.file.getvalue()

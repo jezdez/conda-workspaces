@@ -4,6 +4,11 @@ from __future__ import annotations
 
 import pytest
 
+from conda_workspaces.exceptions import (
+    EnvironmentNotFoundError,
+    FeatureNotFoundError,
+    PlatformError,
+)
 from conda_workspaces.models import (
     Channel,
     Environment,
@@ -76,18 +81,17 @@ def test_feature_is_default(name, expected_default):
 
 
 @pytest.mark.parametrize(
-    "name, features, solve_group, expected_default",
+    "name, features, expected_default",
     [
-        ("default", [], None, True),
-        ("test", ["test"], "main", False),
-        ("docs", ["docs"], None, False),
+        ("default", [], True),
+        ("test", ["test"], False),
+        ("docs", ["docs"], False),
     ],
-    ids=["default", "test-with-group", "docs"],
+    ids=["default", "test", "docs"],
 )
-def test_environment(name, features, solve_group, expected_default):
-    env = Environment(name=name, features=features, solve_group=solve_group)
+def test_environment(name, features, expected_default):
+    env = Environment(name=name, features=features)
     assert env.is_default is expected_default
-    assert env.solve_group == solve_group
 
 
 def test_config_post_init_creates_defaults():
@@ -103,8 +107,6 @@ def test_config_get_environment(sample_config):
 
 
 def test_config_get_environment_not_found(sample_config):
-    from conda_workspaces.exceptions import EnvironmentNotFoundError
-
     with pytest.raises(EnvironmentNotFoundError):
         sample_config.get_environment("nonexistent")
 
@@ -180,15 +182,11 @@ def test_config_merged_channels_deduplication():
 
 
 def test_config_post_init_invalid_platform():
-    from conda_workspaces.exceptions import PlatformError
-
     with pytest.raises(PlatformError):
         WorkspaceConfig(platforms=["not-a-real-platform"])
 
 
 def test_config_resolve_features_unknown_feature():
-    from conda_workspaces.exceptions import FeatureNotFoundError
-
     config = WorkspaceConfig(
         features={"default": Feature(name="default")},
         environments={
@@ -219,8 +217,6 @@ def test_config_merged_conda_deps_with_target():
 
 
 def test_config_merged_pypi_deps_with_target():
-    from conda_workspaces.models import PyPIDependency
-
     default_feat = Feature(
         name="default",
         pypi_dependencies={"requests": PyPIDependency(name="requests", spec=">=2.28")},

@@ -53,8 +53,8 @@ pytest = ">=8.0"
 sphinx = ">=7.0"
 
 [environments]
-default = {solve-group = "default"}
-test = {features = ["test"], solve-group = "default"}
+default = []
+test = {features = ["test"]}
 docs = {features = ["docs"]}
 """
     path = tmp_path / "pixi.toml"
@@ -82,7 +82,7 @@ pytest = ">=8.0"
 pytest-cov = ">=4.0"
 
 [tool.pixi.environments]
-test = {features = ["test"], solve-group = "default"}
+test = {features = ["test"]}
 """
     path = tmp_path / "pyproject.toml"
     path.write_text(content, encoding="utf-8")
@@ -123,8 +123,8 @@ def sample_config() -> WorkspaceConfig:
             "docs": docs_feat,
         },
         environments={
-            "default": Environment(name="default", solve_group="default"),
-            "test": Environment(name="test", features=["test"], solve_group="default"),
+            "default": Environment(name="default"),
+            "test": Environment(name="test", features=["test"]),
             "docs": Environment(name="docs", features=["docs"]),
         },
         root="/tmp/test-project",

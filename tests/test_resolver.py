@@ -5,8 +5,14 @@ from __future__ import annotations
 import pytest
 
 from conda_workspaces.exceptions import EnvironmentNotFoundError, PlatformError
+from conda_workspaces.models import (
+    Channel,
+    Environment,
+    Feature,
+    MatchSpec,
+    WorkspaceConfig,
+)
 from conda_workspaces.resolver import (
-    group_by_solve_group,
     resolve_all_environments,
     resolve_environment,
 )
@@ -58,38 +64,9 @@ def test_resolve_channels(sample_config):
     assert resolved.channels[0].canonical_name == "conda-forge"
 
 
-@pytest.mark.parametrize(
-    "env_name, expected_group",
-    [
-        ("test", "default"),
-        ("docs", None),
-    ],
-    ids=["with-group", "no-group"],
-)
-def test_resolve_solve_group(sample_config, env_name, expected_group):
-    resolved = resolve_environment(sample_config, env_name)
-    assert resolved.solve_group == expected_group
-
-
 def test_resolve_all(sample_config):
     all_resolved = resolve_all_environments(sample_config)
     assert set(all_resolved) == {"default", "test", "docs"}
-
-
-def test_group_by_solve_group(sample_config):
-    all_resolved = resolve_all_environments(sample_config)
-    groups = group_by_solve_group(all_resolved)
-
-    # default and test share solve-group "default"
-    assert "default" in groups
-    names = [r.name for r in groups["default"]]
-    assert "default" in names
-    assert "test" in names
-
-    # docs has no solve-group
-    assert None in groups
-    docs_names = [r.name for r in groups[None]]
-    assert "docs" in docs_names
 
 
 @pytest.mark.parametrize(
@@ -108,14 +85,6 @@ def test_group_by_solve_group(sample_config):
 )
 def test_resolve_platforms(feature_platforms, expected_platforms):
     """Feature platforms are intersected; fallback to workspace platforms."""
-    from conda_workspaces.models import (
-        Channel,
-        Environment,
-        Feature,
-        MatchSpec,
-        WorkspaceConfig,
-    )
-
     features = {}
     for name, plats in feature_platforms.items():
         kwargs = {"name": name}
@@ -149,13 +118,6 @@ def test_resolve_platforms(feature_platforms, expected_platforms):
 
 def test_resolve_activation_merged():
     """Activation scripts and env vars are merged across features."""
-    from conda_workspaces.models import (
-        Channel,
-        Environment,
-        Feature,
-        WorkspaceConfig,
-    )
-
     default_feat = Feature(
         name="default",
         activation_scripts=["base.sh"],
@@ -179,3 +141,49 @@ def test_resolve_activation_merged():
     assert "base.sh" in resolved.activation_scripts
     assert "dev.sh" in resolved.activation_scripts
     assert resolved.activation_env == {"BASE": "1", "DEV": "1"}
+
+
+def test_resolve_system_requirements_merged():
+    """System requirements are merged across features."""
+    default_feat = Feature(
+        name="default",
+        system_requirements={"glibc": "2.17"},
+    )
+    gpu_feat = Feature(
+        name="gpu",
+        system_requirements={"cuda": "12.0"},
+    )
+    config = WorkspaceConfig(
+        channels=[Channel("conda-forge")],
+        platforms=["linux-64"],
+        features={"default": default_feat, "gpu": gpu_feat},
+        environments={
+            "default": Environment(name="default"),
+            "gpu": Environment(name="gpu", features=["gpu"]),
+        },
+    )
+    resolved = resolve_environment(config, "gpu")
+    assert resolved.system_requirements == {"glibc": "2.17", "cuda": "12.0"}
+
+
+@pytest.mark.parametrize(
+    "priority, expected",
+    [
+        ("strict", "strict"),
+        (None, None),
+    ],
+    ids=["explicit-strict", "default-none"],
+)
+def test_resolve_channel_priority(priority, expected):
+    """channel_priority is propagated (or defaults to None)."""
+    kwargs = {
+        "channels": [Channel("conda-forge")],
+        "platforms": ["linux-64"],
+        "features": {"default": Feature(name="default")},
+        "environments": {"default": Environment(name="default")},
+    }
+    if priority is not None:
+        kwargs["channel_priority"] = priority
+    config = WorkspaceConfig(**kwargs)
+    resolved = resolve_environment(config, "default")
+    assert resolved.channel_priority == expected

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from conda.exceptions import CondaError
 
 from conda_workspaces.exceptions import (
     ActivationError,
@@ -96,8 +97,6 @@ def test_exception_message(exc, expected_fragments):
 
 
 def test_inheritance():
-    from conda.exceptions import CondaError
-
     assert issubclass(CondaWorkspacesError, CondaError)
 
 

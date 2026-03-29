@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+from io import StringIO
 from typing import TYPE_CHECKING
 
 import pytest
+from rich.console import Console
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -27,11 +29,20 @@ python = ">=3.10"
 pytest = ">=8.0"
 
 [environments]
-default = {solve-group = "default"}
-test = {features = ["test"], solve-group = "default"}
+default = []
+test = {features = ["test"]}
 """
     (tmp_path / "pixi.toml").write_text(content, encoding="utf-8")
     return tmp_path
+
+
+@pytest.fixture
+def rich_console() -> Console:
+    """A Console that writes to a StringIO buffer for test capture.
+
+    Read captured output via ``rich_console.file.getvalue()``.
+    """
+    return Console(file=StringIO(), width=200)
 
 
 def make_args(defaults: dict, **overrides) -> argparse.Namespace:

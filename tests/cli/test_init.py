@@ -164,7 +164,9 @@ def test_init_auto_detects_single_platform(
 ) -> None:
     """With no --platform arg, init auto-detects exactly one platform."""
     monkeypatch.chdir(tmp_path)
-    args = make_args(_DEFAULTS,manifest_format="conda", name="auto-plat", platforms=None)
+    args = make_args(
+        _DEFAULTS, manifest_format="conda", name="auto-plat", platforms=None,
+    )
     execute_init(args)
     doc = tomlkit.loads((tmp_path / "conda.toml").read_text(encoding="utf-8"))
     platforms = doc["workspace"]["platforms"]

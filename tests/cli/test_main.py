@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 
 import pytest
 
@@ -17,7 +18,10 @@ def test_generate_parser_returns_parser() -> None:
 
 @pytest.mark.parametrize(
     "subcmd",
-    ["init", "install", "lock", "list", "info", "add", "remove", "clean", "run", "activate", "shell"],
+    [
+        "init", "install", "lock", "list", "info",
+        "add", "remove", "clean", "run", "activate", "shell",
+    ],
 )
 def test_subcommands_registered(subcmd: str) -> None:
     parser = generate_parser()
@@ -130,8 +134,6 @@ def test_execute_dispatches_to_subcommand(
     func_name: str,
 ) -> None:
     """Each subcommand dispatches to the correct execute_* function."""
-    import importlib
-
     calls: list[str] = []
 
     def fake_handler(args):

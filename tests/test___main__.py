@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from conda_workspaces.__main__ import main
+from conda_workspaces.cli import main as cli_main_mod
 
 
 class _FakeParser:
@@ -32,8 +33,6 @@ def test_main_sets_prog_to_cw(monkeypatch: pytest.MonkeyPatch) -> None:
     """Parser.prog should be 'cw', not 'conda workspace'."""
     fake_parser = _FakeParser()
 
-    from conda_workspaces.cli import main as cli_main_mod
-
     monkeypatch.setattr(cli_main_mod, "generate_parser", lambda: fake_parser)
     monkeypatch.setattr(cli_main_mod, "execute", lambda parsed: 0)
 
@@ -54,8 +53,6 @@ def test_main_exits_with_execute_return_code(
 ) -> None:
     """main() should SystemExit with whatever execute() returns."""
     fake_parser = _FakeParser()
-
-    from conda_workspaces.cli import main as cli_main_mod
 
     monkeypatch.setattr(cli_main_mod, "generate_parser", lambda: fake_parser)
     monkeypatch.setattr(cli_main_mod, "execute", lambda parsed: exit_code)

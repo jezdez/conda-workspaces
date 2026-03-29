@@ -277,7 +277,9 @@ def test_add_environment_existing_env_no_duplicate(pixi_toml: Path) -> None:
     execute_add(args)
 
     # First add auto-created the env entry. Add again — it shouldn't duplicate.
-    args2 = make_args(_DEFAULTS,file=pixi_toml, specs=["hypothesis"], environment="test")
+    args2 = make_args(
+        _DEFAULTS, file=pixi_toml, specs=["hypothesis"], environment="test",
+    )
     execute_add(args2)
 
     doc2 = tomlkit.loads(pixi_toml.read_text(encoding="utf-8"))

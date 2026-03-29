@@ -150,9 +150,8 @@ def test_parse_pypi_deps(raw, key):
     [
         (["feat1", "feat2"], ["feat1", "feat2"]),
         ({"features": ["a"]}, ["a"]),
-        ({"features": ["a"], "solve-group": "g"}, ["a"]),
     ],
-    ids=["list", "dict-features", "dict-solve-group"],
+    ids=["list", "dict-features"],
 )
 def test_parse_environment(tmp_path, raw, expected_features):
     env = _parse_environment("myenv", raw, tmp_path / "conda.toml")

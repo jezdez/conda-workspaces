@@ -17,11 +17,13 @@ from conda_workspaces.lockfile import (
     _build_lockfile_dict,
     _extract_env_packages,
     _record_to_dict,
+    generate_lockfile,
     install_from_lockfile,
     lockfile_exists,
     lockfile_path,
 )
 from conda_workspaces.models import Channel, Environment, Feature, WorkspaceConfig
+from conda_workspaces.resolver import ResolvedEnvironment
 
 
 def _make_ctx(
@@ -183,9 +185,6 @@ def test_generate_lockfile(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """generate_lockfile solves and writes conda.lock."""
-    from conda_workspaces.lockfile import generate_lockfile
-    from conda_workspaces.resolver import ResolvedEnvironment
-
     ctx = _make_ctx(tmp_path, env_names=["default", "test"])
 
     class FakePkg:
@@ -234,9 +233,6 @@ def test_generate_lockfile_specific_envs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """generate_lockfile with only one env generates only for that env."""
-    from conda_workspaces.lockfile import generate_lockfile
-    from conda_workspaces.resolver import ResolvedEnvironment
-
     ctx = _make_ctx(tmp_path, env_names=["default", "test"])
 
     monkeypatch.setattr(

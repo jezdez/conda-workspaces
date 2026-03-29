@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from conda_workspaces.env_export import (
     _envs_to_dict,
     multiplatform_export,

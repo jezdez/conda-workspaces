@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from conda.exceptions import CondaSystemExit
 
 from conda_workspaces.cli.clean import execute_clean
 from conda_workspaces.exceptions import EnvironmentNotFoundError
@@ -93,8 +94,6 @@ def test_clean_prompt_abort(
     tmp_workspace_env: CreateWorkspaceEnv,
     env_arg: str | None,
 ) -> None:
-    from conda.exceptions import CondaSystemExit
-
     monkeypatch.chdir(pixi_workspace)
     tmp_workspace_env(pixi_workspace, "default")
 

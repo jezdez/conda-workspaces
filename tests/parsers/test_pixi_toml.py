@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from conda_workspaces.exceptions import WorkspaceParseError
 from conda_workspaces.parsers.pixi_toml import PixiTomlParser
 
 
@@ -78,7 +79,6 @@ def test_parse_environments(parser, sample_pixi_toml):
     assert "docs" in config.environments
     test_env = config.environments["test"]
     assert test_env.features == ["test"]
-    assert test_env.solve_group == "default"
 
 
 def test_parse_with_targets(tmp_path):
@@ -177,8 +177,6 @@ dev = ["test", "lint"]
 )
 def test_parse_error(parser, tmp_path, content):
     """Malformed TOML or missing [workspace] raises WorkspaceParseError."""
-    from conda_workspaces.exceptions import WorkspaceParseError
-
     path = tmp_path / "pixi.toml"
     path.write_text(content, encoding="utf-8")
     with pytest.raises(WorkspaceParseError):
