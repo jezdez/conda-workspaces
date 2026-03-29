@@ -72,20 +72,21 @@ def test_resolve_task_args_missing_required():
         _resolve_task_args(task, [])
 
 
-def test_execute_run_dry_run(tmp_path, capsys):
-    """Dry-run should print commands without executing them."""
+def test_execute_run_dry_run_single(tmp_path, capsys):
+    """Dry-run of a single task shows ◌ marker with command."""
     task_file = tmp_path / "conda.toml"
     task_file.write_text('[tasks]\ngreet = "echo hello"\n')
 
     result = execute_run(_run_args(task_file, dry_run=True))
     assert result == 0
     output = capsys.readouterr().out
-    assert "[dry-run]" in output
+    assert "◌" in output
     assert "greet" in output
+    assert "echo hello" in output
 
 
 def test_execute_run_dry_run_with_deps(tmp_path, capsys):
-    """Dry-run prints all tasks in dependency order."""
+    """Dry-run with deps shows a tree with ◌ markers."""
     task_file = tmp_path / "conda.toml"
     task_file.write_text(
         '[tasks]\nsetup = "echo setup"\n\n'
@@ -94,12 +95,13 @@ def test_execute_run_dry_run_with_deps(tmp_path, capsys):
     result = execute_run(_run_args(task_file, task_name="build", dry_run=True))
     assert result == 0
     output = capsys.readouterr().out
-    assert "setup" in output
+    assert "◌" in output
     assert "build" in output
+    assert "setup" in output
 
 
-def test_execute_run_dry_run_alias_done(tmp_path, capsys):
-    """Alias tasks print [done] after their dependencies in dry-run."""
+def test_execute_run_dry_run_alias(tmp_path, capsys):
+    """Alias tasks appear as root of the dry-run tree."""
     task_file = tmp_path / "conda.toml"
     task_file.write_text(
         '[tasks]\nlint = "ruff check ."\ntest = "pytest"\n\n'
@@ -109,13 +111,14 @@ def test_execute_run_dry_run_alias_done(tmp_path, capsys):
     result = execute_run(_run_args(task_file, task_name="check", dry_run=True))
     assert result == 0
     output = capsys.readouterr().out
-    assert "[dry-run] lint" in output
-    assert "[dry-run] test" in output
-    assert "[done] check" in output
+    assert "◌" in output
+    assert "check" in output
+    assert "lint" in output
+    assert "test" in output
 
 
 def test_execute_run_alias_done(tmp_path, capsys, monkeypatch):
-    """Alias tasks print [done] after dependencies finish executing."""
+    """Alias tasks show ✓ marker after dependencies finish executing."""
     task_file = tmp_path / "conda.toml"
     task_file.write_text(
         '[tasks]\nlint = "ruff check ."\ntest = "pytest"\n\n'
@@ -128,17 +131,16 @@ def test_execute_run_alias_done(tmp_path, capsys, monkeypatch):
 
     assert result == 0
     output = capsys.readouterr().out
-    assert "[run] lint" in output
-    assert "[run] test" in output
-    assert "[done] check" in output
+    assert "●" in output
+    assert "✓" in output
+    assert "check" in output
 
 
 def test_execute_run_alias_quiet(tmp_path, capsys, monkeypatch):
-    """Quiet mode suppresses [done] for alias tasks."""
+    """Quiet mode suppresses all output for alias tasks."""
     task_file = tmp_path / "conda.toml"
     task_file.write_text(
-        '[tasks]\nlint = "ruff check ."\n\n'
-        '[tasks.check]\ndepends-on = ["lint"]\n'
+        '[tasks]\nlint = "ruff check ."\n\n[tasks.check]\ndepends-on = ["lint"]\n'
     )
 
     fake = FakeShell()
@@ -152,9 +154,7 @@ def test_execute_run_alias_quiet(tmp_path, capsys, monkeypatch):
 def test_execute_run_list_command(tmp_path, capsys):
     """List-form commands are joined for dry-run display."""
     task_file = tmp_path / "conda.toml"
-    task_file.write_text(
-        '[tasks]\nbuild = "cmake --build ."\n'
-    )
+    task_file.write_text('[tasks]\nbuild = "cmake --build ."\n')
 
     result = execute_run(_run_args(task_file, task_name="build", dry_run=True))
     assert result == 0
@@ -162,8 +162,8 @@ def test_execute_run_list_command(tmp_path, capsys):
     assert "cmake --build ." in output
 
 
-def test_execute_run_real(tmp_path, capsys, monkeypatch):
-    """Actual execution (fake shell) prints [run] and returns 0."""
+def test_execute_run_single_zero_chrome(tmp_path, capsys, monkeypatch):
+    """Single task execution produces no status output (zero chrome)."""
     task_file = tmp_path / "conda.toml"
     task_file.write_text('[tasks]\ngreet = "echo hello"\n')
 
@@ -172,8 +172,8 @@ def test_execute_run_real(tmp_path, capsys, monkeypatch):
     result = execute_run(_run_args(task_file))
 
     assert result == 0
-    output = capsys.readouterr().out
-    assert "[run]" in output
+    assert capsys.readouterr().out == ""
+    assert len(fake.calls) == 1
 
 
 def test_execute_run_quiet(tmp_path, capsys, monkeypatch):
@@ -200,11 +200,76 @@ def test_execute_run_failure(tmp_path, monkeypatch):
         execute_run(_run_args(task_file, task_name="fail"))
 
 
-def test_execute_run_verbose_with_io(tmp_path, capsys, monkeypatch):
-    """Verbose mode prints inputs/outputs."""
+def test_execute_run_failure_with_deps(tmp_path, capsys, monkeypatch):
+    """Failed task in a dep chain shows ✗ marker."""
     task_file = tmp_path / "conda.toml"
     task_file.write_text(
-        '[tasks.build]\ncmd = "make"\ninputs = ["src/*.py"]\noutputs = ["dist/"]\n'
+        '[tasks]\nsetup = "echo setup"\n\n'
+        '[tasks.build]\ncmd = "make"\ndepends-on = ["setup"]\n'
+    )
+
+    calls = []
+
+    def fake_run(cmd, env, cwd, conda_prefix=None, clean_env=False):
+        calls.append(cmd)
+        return 1 if cmd == "make" else 0
+
+    fake = FakeShell()
+    fake.run = fake_run
+    monkeypatch.setattr(run_mod, "SubprocessShell", lambda: fake)
+    with pytest.raises(TaskExecutionError, match="build"):
+        execute_run(_run_args(task_file, task_name="build"))
+
+    output = capsys.readouterr().out
+    assert "✗" in output
+    assert "build" in output
+
+
+def test_execute_run_dep_chain_markers(tmp_path, capsys, monkeypatch):
+    """Dep chain shows ● and ✓ markers for each task."""
+    task_file = tmp_path / "conda.toml"
+    task_file.write_text(
+        '[tasks]\nsetup = "echo setup"\n\n'
+        '[tasks.build]\ncmd = "echo build"\ndepends-on = ["setup"]\n'
+    )
+
+    fake = FakeShell()
+    monkeypatch.setattr(run_mod, "SubprocessShell", lambda: fake)
+    result = execute_run(_run_args(task_file, task_name="build"))
+
+    assert result == 0
+    output = capsys.readouterr().out
+    assert "●" in output
+    assert "✓" in output
+    assert "setup" in output
+    assert "build" in output
+
+
+def test_execute_run_dep_chain_verbose(tmp_path, capsys, monkeypatch):
+    """Verbose mode adds command text to ● markers."""
+    task_file = tmp_path / "conda.toml"
+    task_file.write_text(
+        '[tasks]\nsetup = "echo setup"\n\n'
+        '[tasks.build]\ncmd = "echo build"\ndepends-on = ["setup"]\n'
+    )
+
+    fake = FakeShell()
+    monkeypatch.setattr(run_mod, "SubprocessShell", lambda: fake)
+    result = execute_run(_run_args(task_file, task_name="build", verbose=1))
+
+    assert result == 0
+    output = capsys.readouterr().out
+    assert "echo setup" in output
+    assert "echo build" in output
+
+
+def test_execute_run_verbose_with_io(tmp_path, capsys, monkeypatch):
+    """Verbose mode prints inputs/outputs for tasks in a dep chain."""
+    task_file = tmp_path / "conda.toml"
+    task_file.write_text(
+        '[tasks]\nsetup = "echo ready"\n\n'
+        '[tasks.build]\ncmd = "make"\ninputs = ["src/*.py"]\n'
+        'outputs = ["dist/"]\ndepends-on = ["setup"]\n'
     )
 
     fake = FakeShell()
@@ -218,8 +283,27 @@ def test_execute_run_verbose_with_io(tmp_path, capsys, monkeypatch):
     assert "outputs:" in output
 
 
-def test_execute_run_cached_skips(tmp_path, capsys, monkeypatch):
-    """Cached tasks are skipped with [cached] message."""
+def test_execute_run_cached_in_dep_chain(tmp_path, capsys, monkeypatch):
+    """Cached tasks in a dep chain show ○ marker."""
+    task_file = tmp_path / "conda.toml"
+    task_file.write_text(
+        '[tasks.lint]\ncmd = "ruff"\ninputs = ["src/*.py"]\noutputs = [".lint"]\n\n'
+        '[tasks.build]\ncmd = "make"\ndepends-on = ["lint"]\n'
+    )
+
+    fake = FakeShell()
+    monkeypatch.setattr(run_mod, "SubprocessShell", lambda: fake)
+    monkeypatch.setattr(run_mod, "is_cached", lambda *a, **kw: True)
+    result = execute_run(_run_args(task_file, task_name="build"))
+
+    assert result == 0
+    output = capsys.readouterr().out
+    assert "○" in output
+    assert "cached" in output
+
+
+def test_execute_run_cached_single_silent(tmp_path, capsys, monkeypatch):
+    """Cached single task (no deps) produces no output."""
     task_file = tmp_path / "conda.toml"
     task_file.write_text(
         '[tasks.build]\ncmd = "make"\ninputs = ["src/*.py"]\noutputs = ["dist/"]\n'
@@ -231,8 +315,7 @@ def test_execute_run_cached_skips(tmp_path, capsys, monkeypatch):
     result = execute_run(_run_args(task_file, task_name="build"))
 
     assert result == 0
-    output = capsys.readouterr().out
-    assert "[cached]" in output
+    assert capsys.readouterr().out == ""
 
 
 def test_execute_run_with_cwd_override(tmp_path, capsys, monkeypatch):

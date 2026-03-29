@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from conda.base.context import context
+from rich.console import Console
+from rich.markup import escape
+from rich.tree import Tree
 
 from ...cache import is_cached, save_cache
 from ...exceptions import CondaWorkspacesError, TaskExecutionError
@@ -69,11 +72,38 @@ def _resolve_task_args(task: Task, cli_args: list[str]) -> dict[str, str]:
     return result
 
 
-def execute_run(args: argparse.Namespace) -> int:
+def _build_dry_run_tree(
+    target_name: str,
+    tasks: dict[str, Task],
+    rendered_cmds: dict[str, str],
+) -> Tree:
+    """Build a Rich Tree for dry-run display with ``◌`` markers."""
+
+    def _label(name: str) -> str:
+        cmd = rendered_cmds.get(name)
+        parts = [f"[bold yellow]◌[/bold yellow] {escape(name)}"]
+        if cmd:
+            parts.append(f"── [dim]{escape(cmd)}[/dim]")
+        return " ".join(parts)
+
+    def _add_children(parent: Tree, task_name: str, seen: set[str]) -> None:
+        for dep in tasks[task_name].depends_on:
+            if dep.task in seen:
+                continue
+            child = parent.add(_label(dep.task))
+            _add_children(child, dep.task, seen | {dep.task})
+
+    tree = Tree(_label(target_name))
+    _add_children(tree, target_name, {target_name})
+    return tree
+
+
+def execute_run(args: argparse.Namespace, *, console: Console | None = None) -> int:
     """Execute the ``conda task run`` subcommand."""
-    task_file, tasks = detect_and_parse_tasks(
-        file_path=getattr(args, "file", None)
-    )
+    if console is None:
+        console = Console(highlight=False)
+
+    task_file, tasks = detect_and_parse_tasks(file_path=getattr(args, "file", None))
     project_root = task_file.parent
 
     subdir = context.subdir
@@ -82,9 +112,8 @@ def execute_run(args: argparse.Namespace) -> int:
     target_name = args.task_name
     skip_deps = getattr(args, "skip_deps", False)
 
-    # Ad-hoc command fallback: if not a known task, run as shell command
     if target_name not in tasks:
-        return _run_adhoc(args, target_name, task_file)
+        return _run_adhoc(args, target_name, task_file, console=console)
 
     order = resolve_execution_order(
         target_name,
@@ -104,6 +133,18 @@ def execute_run(args: argparse.Namespace) -> int:
 
     task_args = _resolve_task_args(tasks[target_name], args.task_args)
 
+    if dry_run:
+        return _execute_dry_run(
+            order,
+            tasks,
+            target_name,
+            task_args,
+            task_file,
+            quiet=quiet,
+            console=console,
+        )
+
+    has_deps = len(order) > 1 or tasks[target_name].is_alias
     shell = SubprocessShell()
 
     for name in order:
@@ -176,22 +217,23 @@ def execute_run(args: argparse.Namespace) -> int:
                 rendered_outputs,
                 cwd,
             ):
-                if not quiet:
-                    print(f"  [cached] {name}")
+                if has_deps and not quiet:
+                    console.print(
+                        f"[dim cyan]○[/dim cyan] {escape(name)} [dim](cached)[/dim]"
+                    )
                 continue
 
-        if dry_run:
-            print(f"  [dry-run] {name}: {cmd}")
-            continue
+        if has_deps and not quiet:
+            label = f"[bold blue]●[/bold blue] {escape(name)}"
+            if verbose:
+                label += f" ── [dim]{escape(cmd)}[/dim]"
+            console.print(label)
 
-        if not quiet:
-            print(f"  [run] {name}: {cmd}")
-
-        if verbose and (rendered_inputs or rendered_outputs):
+        if has_deps and verbose and (rendered_inputs or rendered_outputs):
             if rendered_inputs:
-                print(f"    inputs: {rendered_inputs}")
+                console.print(f"  [dim]inputs: {rendered_inputs}[/dim]")
             if rendered_outputs:
-                print(f"    outputs: {rendered_outputs}")
+                console.print(f"  [dim]outputs: {rendered_outputs}[/dim]")
 
         exit_code = shell.run(
             cmd,
@@ -202,7 +244,12 @@ def execute_run(args: argparse.Namespace) -> int:
         )
 
         if exit_code != 0:
+            if has_deps and not quiet:
+                console.print(f"[bold red]✗[/bold red] {escape(name)}")
             raise TaskExecutionError(name, exit_code)
+
+        if has_deps and not quiet:
+            console.print(f"[bold green]✓[/bold green] {escape(name)}")
 
         if rendered_inputs or rendered_outputs:
             save_cache(
@@ -215,9 +262,60 @@ def execute_run(args: argparse.Namespace) -> int:
                 cwd,
             )
 
-    if not quiet and tasks[target_name].is_alias:
-        print(f"  [done] {target_name}")
+    if has_deps and not quiet and tasks[target_name].is_alias:
+        console.print(f"[bold green]✓[/bold green] {escape(target_name)}")
 
+    return 0
+
+
+def _execute_dry_run(
+    order: list[str],
+    tasks: dict[str, Task],
+    target_name: str,
+    task_args: dict[str, str],
+    task_file: Path,
+    *,
+    quiet: bool,
+    console: Console,
+) -> int:
+    """Render commands and display a static Rich Tree for dry-run."""
+    rendered_cmds: dict[str, str] = {}
+    for name in order:
+        task = tasks[name]
+        if task.is_alias:
+            continue
+
+        if name == target_name:
+            current_args = task_args
+        else:
+            dep_info = next(
+                (d for d in tasks[target_name].depends_on if d.task == name),
+                None,
+            )
+            current_args = {}
+            if dep_info and dep_info.args:
+                for i, da in enumerate(dep_info.args):
+                    if isinstance(da, dict):
+                        current_args.update(da)
+                    elif i < len(task.args):
+                        current_args[task.args[i].name] = render(
+                            da,
+                            manifest_path=task_file,
+                            task_args=task_args,
+                        )
+
+        cmd = task.cmd
+        if cmd is None:
+            continue
+        if isinstance(cmd, list):
+            cmd = " ".join(cmd)
+        rendered_cmds[name] = render(
+            cmd, manifest_path=task_file, task_args=current_args
+        )
+
+    if not quiet:
+        tree = _build_dry_run_tree(target_name, tasks, rendered_cmds)
+        console.print(tree)
     return 0
 
 
@@ -225,6 +323,8 @@ def _run_adhoc(
     args: argparse.Namespace,
     cmd_name: str,
     task_file: Path,
+    *,
+    console: Console,
 ) -> int:
     """Run an ad-hoc shell command (not a named task)."""
     task_args = list(getattr(args, "task_args", []))
@@ -234,16 +334,13 @@ def _run_adhoc(
     if templated:
         full_cmd = render(full_cmd, manifest_path=task_file)
 
-    quiet = getattr(args, "quiet", False)
     dry_run = getattr(args, "dry_run", False)
     conda_prefix = _env_prefix_or_none(args)
 
     if dry_run:
-        print(f"  [dry-run] {full_cmd}")
+        if not getattr(args, "quiet", False):
+            console.print(f"[bold yellow]◌[/bold yellow] [dim]{escape(full_cmd)}[/dim]")
         return 0
-
-    if not quiet:
-        print(f"  [run] {full_cmd}")
 
     shell = SubprocessShell()
     cwd = Path(getattr(args, "cwd", None) or task_file.parent)
