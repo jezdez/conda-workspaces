@@ -248,6 +248,24 @@ def configure_workspace_parser(parser: argparse.ArgumentParser) -> None:
         help="Environment name (default: default).",
     )
 
+    run_parser = sub.add_parser(
+        "run",
+        help="Run a command in a workspace environment.",
+        add_help=False,
+    )
+    add_parser_help(run_parser)
+    run_parser.add_argument(
+        "-e",
+        "--environment",
+        default="default",
+        help="Environment name (default: default).",
+    )
+    run_parser.add_argument(
+        "cmd",
+        nargs=argparse.REMAINDER,
+        help="Command to run (use -- to separate from options).",
+    )
+
     shell_parser = sub.add_parser(
         "shell",
         help="Spawn a new shell with an environment activated.",
@@ -317,6 +335,10 @@ def execute_workspace(args: argparse.Namespace) -> int:
         from .workspace.activate import execute_activate
 
         return execute_activate(args)
+    elif subcmd == "run":
+        from .workspace.run import execute_run
+
+        return execute_run(args)
     elif subcmd == "shell":
         from .workspace.shell import execute_shell
 
