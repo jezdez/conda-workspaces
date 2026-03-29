@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
-import argparse
 from typing import TYPE_CHECKING
 
 import pytest
 
 from conda_workspaces.cli.install import execute_install
 
+from .conftest import make_args
+
 if TYPE_CHECKING:
     from pathlib import Path
 
-_INSTALL_DEFAULTS = {
+_DEFAULTS = {
     "file": None,
     "environment": None,
     "force_reinstall": False,
@@ -20,10 +21,6 @@ _INSTALL_DEFAULTS = {
     "locked": False,
     "frozen": False,
 }
-
-
-def _make_args(**kwargs) -> argparse.Namespace:
-    return argparse.Namespace(**{**_INSTALL_DEFAULTS, **kwargs})
 
 
 def _stub_lockfile(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -51,7 +48,6 @@ def test_install_envs(
     output_fragment: str,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    _stub_lockfile(monkeypatch)
 
     calls: list[str] = []
 
@@ -62,11 +58,19 @@ def test_install_envs(
         "conda_workspaces.cli.install.install_environment", fake_install
     )
 
-    args = _make_args(environment=env_arg)
+    lock_calls: list[dict] = []
+    monkeypatch.setattr(
+        "conda_workspaces.cli.install.generate_lockfile",
+        lambda ctx, resolved_envs: lock_calls.append(resolved_envs),
+    )
+
+    args = make_args(_DEFAULTS, environment=env_arg)
     result = execute_install(args)
     assert result == 0
     assert set(calls) == expected_names
     assert output_fragment in capsys.readouterr().out
+    assert len(lock_calls) == 1
+    assert set(lock_calls[0].keys()) == expected_names
 
 
 @pytest.mark.parametrize(
@@ -96,42 +100,9 @@ def test_install_flags_forwarded(
         "conda_workspaces.cli.install.install_environment", fake_install
     )
 
-    args = _make_args(environment="default", force_reinstall=force, dry_run=dry_run)
+    args = make_args(_DEFAULTS, environment="default", force_reinstall=force, dry_run=dry_run)
     execute_install(args)
     assert recorded[0] == (force, dry_run)
-
-
-@pytest.mark.parametrize(
-    "env_arg, expected_keys",
-    [
-        ("default", {"default"}),
-        (None, {"default", "test"}),
-    ],
-    ids=["single-env", "all-envs"],
-)
-def test_install_generates_lockfile(
-    pixi_workspace: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    env_arg: str | None,
-    expected_keys: set[str],
-) -> None:
-    monkeypatch.chdir(pixi_workspace)
-
-    monkeypatch.setattr(
-        "conda_workspaces.cli.install.install_environment",
-        lambda ctx, resolved, **kw: None,
-    )
-
-    lock_calls: list[dict] = []
-    monkeypatch.setattr(
-        "conda_workspaces.cli.install.generate_lockfile",
-        lambda ctx, resolved_envs: lock_calls.append(resolved_envs),
-    )
-
-    args = _make_args(environment=env_arg)
-    execute_install(args)
-    assert len(lock_calls) == 1
-    assert set(lock_calls[0].keys()) == expected_keys
 
 
 def test_install_dry_run_skips_lockfile(
@@ -151,7 +122,7 @@ def test_install_dry_run_skips_lockfile(
         lambda ctx, resolved_envs: lock_calls.append(resolved_envs),
     )
 
-    args = _make_args(environment="default", dry_run=True)
+    args = make_args(_DEFAULTS,environment="default", dry_run=True)
     execute_install(args)
     assert lock_calls == []
 
@@ -180,7 +151,7 @@ def test_install_frozen(
         lambda ctx, name: locked_calls.append(name),
     )
 
-    args = _make_args(environment=env_arg, frozen=True)
+    args = make_args(_DEFAULTS,environment=env_arg, frozen=True)
     result = execute_install(args)
     assert result == 0
     assert set(locked_calls) == expected_names
@@ -205,6 +176,6 @@ def test_install_locked_validates_freshness(
     manifest = pixi_workspace / "pixi.toml"
     manifest.write_text(manifest.read_text(encoding="utf-8"), encoding="utf-8")
 
-    args = _make_args(locked=True)
+    args = make_args(_DEFAULTS,locked=True)
     with pytest.raises(LockfileStaleError):
         execute_install(args)

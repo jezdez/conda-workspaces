@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -15,16 +14,14 @@ from conda_workspaces.exceptions import (
     EnvironmentNotInstalledError,
 )
 
+from .conftest import make_args
+
 if TYPE_CHECKING:
     from pathlib import Path
 
     from tests.conftest import CreateWorkspaceEnv
 
-_RUN_DEFAULTS = {"file": None, "environment": "default", "cmd": []}
-
-
-def _make_args(**kwargs) -> argparse.Namespace:
-    return argparse.Namespace(**{**_RUN_DEFAULTS, **kwargs})
+_DEFAULTS = {"file": None, "environment": "default", "cmd": []}
 
 
 @dataclass
@@ -85,7 +82,7 @@ def test_run_error(
     match: str,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    args = _make_args(cmd=cmd)
+    args = make_args(_DEFAULTS,cmd=cmd)
     with pytest.raises(exc_type, match=match):
         execute_run(args)
 
@@ -101,7 +98,7 @@ def test_run_strips_double_dash(
     recorded_cmds: list[list[str]] = []
     _stub_run_deps(monkeypatch, recorded_cmds=recorded_cmds)
 
-    args = _make_args(cmd=["--", "pytest", "-v"])
+    args = make_args(_DEFAULTS,cmd=["--", "pytest", "-v"])
     execute_run(args)
 
     # wrap_subprocess_call should receive the cmd without leading "--"
@@ -128,7 +125,7 @@ def test_run_exit_code(
 
     _stub_run_deps(monkeypatch, rc=rc)
 
-    args = _make_args(cmd=cmd)
+    args = make_args(_DEFAULTS,cmd=cmd)
     result = execute_run(args)
     assert result == rc
 
@@ -138,6 +135,6 @@ def test_run_undefined_environment(
 ) -> None:
     """Undefined env raises EnvironmentNotFoundError."""
     monkeypatch.chdir(pixi_workspace)
-    args = _make_args(environment="nonexistent", cmd=["echo", "hi"])
+    args = make_args(_DEFAULTS,environment="nonexistent", cmd=["echo", "hi"])
     with pytest.raises(EnvironmentNotFoundError, match="not defined"):
         execute_run(args)

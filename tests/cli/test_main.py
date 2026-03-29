@@ -17,7 +17,7 @@ def test_generate_parser_returns_parser() -> None:
 
 @pytest.mark.parametrize(
     "subcmd",
-    ["init", "install", "list", "info", "add", "remove", "clean", "run", "activate"],
+    ["init", "install", "lock", "list", "info", "add", "remove", "clean", "run", "activate", "shell"],
 )
 def test_subcommands_registered(subcmd: str) -> None:
     parser = generate_parser()

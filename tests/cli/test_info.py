@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import json
 from typing import TYPE_CHECKING
 
@@ -10,16 +9,14 @@ import pytest
 
 from conda_workspaces.cli.info import execute_info
 
+from .conftest import make_args
+
 if TYPE_CHECKING:
     from pathlib import Path
 
     from tests.conftest import CreateWorkspaceEnv
 
-_INFO_DEFAULTS = {"file": None, "environment": None, "json": False}
-
-
-def _make_args(**kwargs) -> argparse.Namespace:
-    return argparse.Namespace(**{**_INFO_DEFAULTS, **kwargs})
+_DEFAULTS = {"file": None, "environment": None, "json": False}
 
 
 def test_info_workspace_overview(
@@ -28,7 +25,7 @@ def test_info_workspace_overview(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    args = _make_args()
+    args = make_args(_DEFAULTS)
     result = execute_info(args)
     assert result == 0
     out = capsys.readouterr().out
@@ -61,7 +58,7 @@ def test_info_env_details(
     expected_fragments: list[str],
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    args = _make_args(environment=env_name)
+    args = make_args(_DEFAULTS,environment=env_name)
     result = execute_info(args)
     assert result == 0
     out = capsys.readouterr().out
@@ -78,7 +75,7 @@ def test_info_installed_env(
     monkeypatch.chdir(pixi_workspace)
     tmp_workspace_env(pixi_workspace, "default", pkg_count=3)
 
-    args = _make_args(environment="default")
+    args = make_args(_DEFAULTS,environment="default")
     execute_info(args)
     out = capsys.readouterr().out
     assert "Installed:   yes" in out
@@ -91,7 +88,7 @@ def test_info_json_workspace(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    args = _make_args(json=True)
+    args = make_args(_DEFAULTS,json=True)
     execute_info(args)
     out = capsys.readouterr().out
     data = json.loads(out)
@@ -106,7 +103,7 @@ def test_info_json_env(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    args = _make_args(environment="default", json=True)
+    args = make_args(_DEFAULTS,environment="default", json=True)
     execute_info(args)
     out = capsys.readouterr().out
     data = json.loads(out)
@@ -135,7 +132,7 @@ requests = ">=2.28"
 """
     (tmp_path / "pixi.toml").write_text(content, encoding="utf-8")
     monkeypatch.chdir(tmp_path)
-    args = _make_args(environment="default")
+    args = make_args(_DEFAULTS,environment="default")
     execute_info(args)
     out = capsys.readouterr().out
     assert "PyPI dependencies:" in out

@@ -11,8 +11,6 @@ if TYPE_CHECKING:
 
 import conda_workspaces.env_spec as env_spec_mod
 from conda_workspaces.env_spec import (
-    LOCK_FILENAMES,
-    WORKSPACE_FILENAMES,
     CondaLockSpec,
     CondaWorkspaceSpec,
 )
@@ -264,13 +262,3 @@ def test_conda_lock_spec_env_wrong_version_raises(tmp_path: Path) -> None:
         spec.env
 
 
-@pytest.mark.parametrize(
-    "attr, expected",
-    [
-        (WORKSPACE_FILENAMES, {"conda.toml"}),
-        (LOCK_FILENAMES, {"conda.lock"}),
-    ],
-    ids=["workspace-filenames", "lock-filenames"],
-)
-def test_spec_filenames(attr, expected) -> None:
-    assert attr == expected

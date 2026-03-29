@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 from typing import TYPE_CHECKING
 
 import pytest
@@ -10,16 +9,14 @@ import pytest
 from conda_workspaces.cli.clean import execute_clean
 from conda_workspaces.exceptions import EnvironmentNotFoundError
 
+from .conftest import make_args
+
 if TYPE_CHECKING:
     from pathlib import Path
 
     from tests.conftest import CreateWorkspaceEnv
 
-_CLEAN_DEFAULTS = {"file": None, "environment": None}
-
-
-def _make_args(**kwargs) -> argparse.Namespace:
-    return argparse.Namespace(**{**_CLEAN_DEFAULTS, **kwargs})
+_DEFAULTS = {"file": None, "environment": None}
 
 
 def _stub_confirm_and_unregister(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -39,7 +36,7 @@ def test_clean_single_environment(
     prefix = tmp_workspace_env(pixi_workspace, "default")
     assert prefix.is_dir()
 
-    args = _make_args(environment="default")
+    args = make_args(_DEFAULTS,environment="default")
     result = execute_clean(args)
     assert result == 0
     assert not prefix.is_dir()
@@ -57,7 +54,7 @@ def test_clean_all_environments(
     tmp_workspace_env(pixi_workspace, "default")
     tmp_workspace_env(pixi_workspace, "test")
 
-    args = _make_args()
+    args = make_args(_DEFAULTS)
     result = execute_clean(args)
     assert result == 0
     assert "Removed 2" in capsys.readouterr().out
@@ -79,7 +76,7 @@ def test_clean_nothing_to_remove(
     expected_msg: str,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    args = _make_args(environment=env_arg)
+    args = make_args(_DEFAULTS,environment=env_arg)
     result = execute_clean(args)
     assert result == 0
     assert expected_msg in capsys.readouterr().out
@@ -107,7 +104,7 @@ def test_clean_prompt_abort(
     monkeypatch.setattr("conda_workspaces.cli.clean.confirm_yn", raise_abort)
     monkeypatch.setattr("conda_workspaces.envs.unregister_env", lambda path: None)
 
-    args = _make_args(environment=env_arg)
+    args = make_args(_DEFAULTS,environment=env_arg)
     result = execute_clean(args)
     assert result == 0
     assert (pixi_workspace / ".conda" / "envs" / "default" / "conda-meta").is_dir()
@@ -118,6 +115,6 @@ def test_clean_undefined_environment(
 ) -> None:
     """clean with an undefined env raises EnvironmentNotFoundError."""
     monkeypatch.chdir(pixi_workspace)
-    args = _make_args(environment="nonexistent")
+    args = make_args(_DEFAULTS,environment="nonexistent")
     with pytest.raises(EnvironmentNotFoundError, match="not defined"):
         execute_clean(args)

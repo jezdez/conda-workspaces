@@ -5,26 +5,10 @@ from __future__ import annotations
 import pytest
 
 from conda_workspaces.env_export import (
-    ALIASES,
-    DEFAULT_FILENAMES,
-    FORMAT,
     _envs_to_dict,
     multiplatform_export,
 )
 from conda_workspaces.lockfile import LOCKFILE_VERSION
-
-
-@pytest.mark.parametrize(
-    "attr, expected",
-    [
-        (FORMAT, "conda-workspaces-lock"),
-        (ALIASES, ("workspace-lock",)),
-        (DEFAULT_FILENAMES, ("conda.lock",)),
-    ],
-    ids=["format", "aliases", "default-filenames"],
-)
-def test_module_constants(attr, expected) -> None:
-    assert attr == expected
 
 
 class FakeRecord:

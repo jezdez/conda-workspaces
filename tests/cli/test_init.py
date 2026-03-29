@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 from typing import TYPE_CHECKING
 
 import pytest
@@ -11,20 +10,18 @@ import tomlkit
 from conda_workspaces.cli.init import execute_init
 from conda_workspaces.exceptions import ManifestExistsError
 
+from .conftest import make_args
+
 if TYPE_CHECKING:
     from pathlib import Path
 
-_INIT_DEFAULTS = {
+_DEFAULTS = {
     "manifest_format": "conda",
     "name": None,
     "channels": None,
     "platforms": ["linux-64", "osx-arm64", "win-64"],
     "file": None,
 }
-
-
-def _make_args(**kwargs) -> argparse.Namespace:
-    return argparse.Namespace(**{**_INIT_DEFAULTS, **kwargs})
 
 
 @pytest.mark.parametrize(
@@ -40,7 +37,7 @@ def test_init_creates_manifest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fmt: str, filename: str
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    args = _make_args(manifest_format=fmt, name="my-project")
+    args = make_args(_DEFAULTS,manifest_format=fmt, name="my-project")
     result = execute_init(args)
     assert result == 0
     assert (tmp_path / filename).exists()
@@ -62,7 +59,7 @@ def test_init_refuses_overwrite(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / filename).write_text("existing content", encoding="utf-8")
-    args = _make_args(manifest_format=fmt, name="proj")
+    args = make_args(_DEFAULTS,manifest_format=fmt, name="proj")
     with pytest.raises(ManifestExistsError, match="already exists"):
         execute_init(args)
 
@@ -71,7 +68,7 @@ def test_init_pixi_toml_structure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    args = _make_args(
+    args = make_args(_DEFAULTS,
         manifest_format="pixi",
         name="structured",
         channels=["conda-forge", "bioconda"],
@@ -89,7 +86,7 @@ def test_init_conda_toml_structure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    args = _make_args(manifest_format="conda", name="my-conda")
+    args = make_args(_DEFAULTS,manifest_format="conda", name="my-conda")
     execute_init(args)
     doc = tomlkit.loads((tmp_path / "conda.toml").read_text(encoding="utf-8"))
     assert doc["workspace"]["name"] == "my-conda"
@@ -99,10 +96,11 @@ def test_init_pyproject_creates_tool_conda(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    args = _make_args(manifest_format="pyproject", name="pp")
+    args = make_args(_DEFAULTS, manifest_format="pyproject", name="pp")
     execute_init(args)
     doc = tomlkit.loads((tmp_path / "pyproject.toml").read_text(encoding="utf-8"))
     assert "conda" in doc["tool"]
+    assert "pixi" not in doc["tool"]
     ws = doc["tool"]["conda"]["workspace"]
     assert ws["name"] == "pp"
     assert "channels" in ws
@@ -116,7 +114,7 @@ def test_init_pyproject_appends_to_existing(
     monkeypatch.chdir(tmp_path)
     existing = '[project]\nname = "existing"\n'
     (tmp_path / "pyproject.toml").write_text(existing, encoding="utf-8")
-    args = _make_args(manifest_format="pyproject", name="pp")
+    args = make_args(_DEFAULTS,manifest_format="pyproject", name="pp")
     execute_init(args)
     doc = tomlkit.loads((tmp_path / "pyproject.toml").read_text(encoding="utf-8"))
     assert doc["project"]["name"] == "existing"
@@ -138,7 +136,7 @@ def test_init_pyproject_refuses_existing_workspace(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / "pyproject.toml").write_text(existing_content, encoding="utf-8")
-    args = _make_args(manifest_format="pyproject", name="pp")
+    args = make_args(_DEFAULTS,manifest_format="pyproject", name="pp")
     with pytest.raises(ManifestExistsError, match="already exists"):
         execute_init(args)
 
@@ -147,7 +145,7 @@ def test_init_default_name_from_dir(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    args = _make_args(manifest_format="pixi", name=None)
+    args = make_args(_DEFAULTS,manifest_format="pixi", name=None)
     execute_init(args)
     doc = tomlkit.loads((tmp_path / "pixi.toml").read_text(encoding="utf-8"))
     assert doc["workspace"]["name"] == tmp_path.name
@@ -155,7 +153,7 @@ def test_init_default_name_from_dir(
 
 def test_init_default_channels(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
-    args = _make_args(manifest_format="pixi", name="ch-test", channels=None)
+    args = make_args(_DEFAULTS,manifest_format="pixi", name="ch-test", channels=None)
     execute_init(args)
     doc = tomlkit.loads((tmp_path / "pixi.toml").read_text(encoding="utf-8"))
     assert doc["workspace"]["channels"] == ["conda-forge"]
@@ -166,7 +164,7 @@ def test_init_auto_detects_single_platform(
 ) -> None:
     """With no --platform arg, init auto-detects exactly one platform."""
     monkeypatch.chdir(tmp_path)
-    args = _make_args(manifest_format="conda", name="auto-plat", platforms=None)
+    args = make_args(_DEFAULTS,manifest_format="conda", name="auto-plat", platforms=None)
     execute_init(args)
     doc = tomlkit.loads((tmp_path / "conda.toml").read_text(encoding="utf-8"))
     platforms = doc["workspace"]["platforms"]
@@ -176,24 +174,12 @@ def test_init_auto_detects_single_platform(
 def test_init_unknown_format(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Unknown format returns 1 without creating files."""
     monkeypatch.chdir(tmp_path)
-    args = _make_args(manifest_format="unknown", name="test")
+    args = make_args(_DEFAULTS,manifest_format="unknown", name="test")
     result = execute_init(args)
     assert result == 1
     assert not (tmp_path / "pixi.toml").exists()
     assert not (tmp_path / "conda.toml").exists()
     assert not (tmp_path / "pyproject.toml").exists()
-
-
-def test_init_pyproject_uses_tool_conda(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """--format pyproject creates [tool.conda.*], not [tool.pixi.*]."""
-    monkeypatch.chdir(tmp_path)
-    args = _make_args(manifest_format="pyproject", name="myproj")
-    execute_init(args)
-    doc = tomlkit.loads((tmp_path / "pyproject.toml").read_text(encoding="utf-8"))
-    assert "conda" in doc["tool"]
-    assert "pixi" not in doc["tool"]
 
 
 @pytest.mark.parametrize(
@@ -214,7 +200,7 @@ def test_init_no_version_field(
 ) -> None:
     """init does not include a version field in the generated manifest."""
     monkeypatch.chdir(tmp_path)
-    args = _make_args(manifest_format=fmt, name="novr")
+    args = make_args(_DEFAULTS,manifest_format=fmt, name="novr")
     execute_init(args)
     doc = tomlkit.loads((tmp_path / filename).read_text(encoding="utf-8"))
     ws = doc

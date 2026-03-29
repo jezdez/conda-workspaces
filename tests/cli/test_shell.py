@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 from typing import TYPE_CHECKING
 
 import pytest
@@ -13,16 +12,14 @@ from conda_workspaces.exceptions import (
     EnvironmentNotInstalledError,
 )
 
+from .conftest import make_args
+
 if TYPE_CHECKING:
     from pathlib import Path
 
     from tests.conftest import CreateWorkspaceEnv
 
-_SHELL_DEFAULTS = {"file": None, "environment": "default", "cmd": []}
-
-
-def _make_args(**kwargs) -> argparse.Namespace:
-    return argparse.Namespace(**{**_SHELL_DEFAULTS, **kwargs})
+_DEFAULTS = {"file": None, "environment": "default", "cmd": []}
 
 
 @pytest.mark.parametrize(
@@ -51,7 +48,7 @@ def test_shell_spawns_env(
 
     monkeypatch.setattr("conda_spawn.main.spawn", fake_spawn)
 
-    args = _make_args(environment=env_name)
+    args = make_args(_DEFAULTS,environment=env_name)
     result = execute_shell(args)
     assert result == 0
     assert len(spawn_calls) == 1
@@ -87,7 +84,7 @@ def test_shell_command_passthrough(
 
     monkeypatch.setattr("conda_spawn.main.spawn", fake_spawn)
 
-    args = _make_args(cmd=cmd_input)
+    args = make_args(_DEFAULTS,cmd=cmd_input)
     result = execute_shell(args)
     assert result == 0
     assert spawn_calls[0]["command"] == expected_command
@@ -108,7 +105,7 @@ def test_shell_error(
     exc_type: type,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    args = _make_args(environment=env_name)
+    args = make_args(_DEFAULTS,environment=env_name)
     with pytest.raises(exc_type):
         execute_shell(args)
 
@@ -126,5 +123,5 @@ def test_shell_propagates_exit_code(
 
     monkeypatch.setattr("conda_spawn.main.spawn", fake_spawn)
 
-    args = _make_args()
+    args = make_args(_DEFAULTS)
     assert execute_shell(args) == 42

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 from typing import TYPE_CHECKING
 
 import pytest
@@ -31,3 +32,8 @@ test = {features = ["test"], solve-group = "default"}
 """
     (tmp_path / "pixi.toml").write_text(content, encoding="utf-8")
     return tmp_path
+
+
+def make_args(defaults: dict, **overrides) -> argparse.Namespace:
+    """Build an argparse.Namespace from *defaults* merged with *overrides*."""
+    return argparse.Namespace(**{**defaults, **overrides})

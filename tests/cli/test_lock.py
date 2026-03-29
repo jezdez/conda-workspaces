@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 from typing import TYPE_CHECKING
 
 import pytest
@@ -10,17 +9,15 @@ import pytest
 from conda_workspaces.cli.lock import execute_lock
 from conda_workspaces.exceptions import EnvironmentNotFoundError
 
+from .conftest import make_args
+
 if TYPE_CHECKING:
     from pathlib import Path
 
-_LOCK_DEFAULTS = {
+_DEFAULTS = {
     "file": None,
     "environment": None,
 }
-
-
-def _make_args(**kwargs) -> argparse.Namespace:
-    return argparse.Namespace(**{**_LOCK_DEFAULTS, **kwargs})
 
 
 @pytest.mark.parametrize(
@@ -50,7 +47,7 @@ def test_lock_envs(
         )[1],
     )
 
-    result = execute_lock(_make_args(environment=env_arg))
+    result = execute_lock(make_args(_DEFAULTS,environment=env_arg))
     assert result == 0
     assert len(lock_calls) == 1
     assert set(lock_calls[0].keys()) == expected_keys
@@ -64,4 +61,4 @@ def test_lock_unknown_env(
     monkeypatch.chdir(pixi_workspace)
 
     with pytest.raises(EnvironmentNotFoundError):
-        execute_lock(_make_args(environment="nonexistent"))
+        execute_lock(make_args(_DEFAULTS,environment="nonexistent"))

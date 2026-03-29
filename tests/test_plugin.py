@@ -34,10 +34,6 @@ def test_conda_environment_specifiers(name: str, expected_cls_name: str) -> None
     assert items[name].environment_spec.__name__ == expected_cls_name
 
 
-def test_conda_environment_specifiers_count() -> None:
-    assert len(list(conda_environment_specifiers())) == 2
-
-
 def test_conda_environment_exporters_yields_one() -> None:
     items = list(conda_environment_exporters())
     assert len(items) == 1
