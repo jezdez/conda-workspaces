@@ -16,6 +16,8 @@ from conda_workspaces.exceptions import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from tests.conftest import CreateWorkspaceEnv
+
 _SHELL_DEFAULTS = {"file": None, "environment": "default", "cmd": []}
 
 
@@ -34,13 +36,12 @@ def _make_args(**kwargs) -> argparse.Namespace:
 def test_shell_spawns_env(
     pixi_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
+    tmp_workspace_env: CreateWorkspaceEnv,
     env_name: str,
     expected_path_part: str,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    meta = pixi_workspace / ".conda" / "envs" / env_name / "conda-meta"
-    meta.mkdir(parents=True)
-    (meta / "history").write_text("", encoding="utf-8")
+    tmp_workspace_env(pixi_workspace, env_name)
 
     spawn_calls: list[dict] = []
 
@@ -71,13 +72,12 @@ def test_shell_spawns_env(
 def test_shell_command_passthrough(
     pixi_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
+    tmp_workspace_env: CreateWorkspaceEnv,
     cmd_input: list[str],
     expected_command: list[str] | None,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    meta = pixi_workspace / ".conda" / "envs" / "default" / "conda-meta"
-    meta.mkdir(parents=True)
-    (meta / "history").write_text("", encoding="utf-8")
+    tmp_workspace_env(pixi_workspace, "default")
 
     spawn_calls: list[dict] = []
 
@@ -114,12 +114,12 @@ def test_shell_error(
 
 
 def test_shell_propagates_exit_code(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    meta = pixi_workspace / ".conda" / "envs" / "default" / "conda-meta"
-    meta.mkdir(parents=True)
-    (meta / "history").write_text("", encoding="utf-8")
+    tmp_workspace_env(pixi_workspace, "default")
 
     def fake_spawn(*, prefix, command=None):
         return 42

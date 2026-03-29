@@ -34,35 +34,21 @@ def _stub_lockfile(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def test_install_single_env(
+@pytest.mark.parametrize(
+    "env_arg, expected_names, output_fragment",
+    [
+        ("default", {"default"}, "Installing"),
+        (None, {"default", "test"}, "2 environment(s)"),
+    ],
+    ids=["single-env", "all-envs"],
+)
+def test_install_envs(
     pixi_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-) -> None:
-    monkeypatch.chdir(pixi_workspace)
-    _stub_lockfile(monkeypatch)
-
-    calls: list[tuple[str, bool, bool]] = []
-
-    def fake_install(ctx, resolved, *, force_reinstall=False, dry_run=False):
-        calls.append((resolved.name, force_reinstall, dry_run))
-
-    monkeypatch.setattr(
-        "conda_workspaces.cli.install.install_environment", fake_install
-    )
-
-    args = _make_args(environment="default")
-    result = execute_install(args)
-    assert result == 0
-    assert len(calls) == 1
-    assert calls[0][0] == "default"
-    assert "Installing" in capsys.readouterr().out
-
-
-def test_install_all_envs(
-    pixi_workspace: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+    env_arg: str | None,
+    expected_names: set[str],
+    output_fragment: str,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
     _stub_lockfile(monkeypatch)
@@ -76,11 +62,11 @@ def test_install_all_envs(
         "conda_workspaces.cli.install.install_environment", fake_install
     )
 
-    args = _make_args()
+    args = _make_args(environment=env_arg)
     result = execute_install(args)
     assert result == 0
-    assert set(calls) == {"default", "test"}
-    assert "2 environment(s)" in capsys.readouterr().out
+    assert set(calls) == expected_names
+    assert output_fragment in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(
@@ -115,9 +101,19 @@ def test_install_flags_forwarded(
     assert recorded[0] == (force, dry_run)
 
 
+@pytest.mark.parametrize(
+    "env_arg, expected_keys",
+    [
+        ("default", {"default"}),
+        (None, {"default", "test"}),
+    ],
+    ids=["single-env", "all-envs"],
+)
 def test_install_generates_lockfile(
     pixi_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
+    env_arg: str | None,
+    expected_keys: set[str],
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
 
@@ -132,33 +128,10 @@ def test_install_generates_lockfile(
         lambda ctx, resolved_envs: lock_calls.append(resolved_envs),
     )
 
-    args = _make_args(environment="default")
+    args = _make_args(environment=env_arg)
     execute_install(args)
     assert len(lock_calls) == 1
-    assert "default" in lock_calls[0]
-
-
-def test_install_all_generates_lockfile(
-    pixi_workspace: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.chdir(pixi_workspace)
-
-    monkeypatch.setattr(
-        "conda_workspaces.cli.install.install_environment",
-        lambda ctx, resolved, **kw: None,
-    )
-
-    lock_calls: list[dict] = []
-    monkeypatch.setattr(
-        "conda_workspaces.cli.install.generate_lockfile",
-        lambda ctx, resolved_envs: lock_calls.append(resolved_envs),
-    )
-
-    args = _make_args()
-    execute_install(args)
-    assert len(lock_calls) == 1
-    assert set(lock_calls[0].keys()) == {"default", "test"}
+    assert set(lock_calls[0].keys()) == expected_keys
 
 
 def test_install_dry_run_skips_lockfile(
@@ -183,10 +156,21 @@ def test_install_dry_run_skips_lockfile(
     assert lock_calls == []
 
 
-def test_install_frozen_single(
+@pytest.mark.parametrize(
+    "env_arg, expected_names, output_fragment",
+    [
+        ("default", {"default"}, "from lockfile"),
+        (None, {"default", "test"}, "from lockfiles"),
+    ],
+    ids=["single-env", "all-envs"],
+)
+def test_install_frozen(
     pixi_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    env_arg: str | None,
+    expected_names: set[str],
+    output_fragment: str,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
 
@@ -196,31 +180,11 @@ def test_install_frozen_single(
         lambda ctx, name: locked_calls.append(name),
     )
 
-    args = _make_args(environment="default", frozen=True)
+    args = _make_args(environment=env_arg, frozen=True)
     result = execute_install(args)
     assert result == 0
-    assert locked_calls == ["default"]
-    assert "from lockfile" in capsys.readouterr().out
-
-
-def test_install_frozen_all(
-    pixi_workspace: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    monkeypatch.chdir(pixi_workspace)
-
-    locked_calls: list[str] = []
-    monkeypatch.setattr(
-        "conda_workspaces.cli.install.install_from_lockfile",
-        lambda ctx, name: locked_calls.append(name),
-    )
-
-    args = _make_args(frozen=True)
-    result = execute_install(args)
-    assert result == 0
-    assert set(locked_calls) == {"default", "test"}
-    assert "from lockfiles" in capsys.readouterr().out
+    assert set(locked_calls) == expected_names
+    assert output_fragment in capsys.readouterr().out
 
 
 def test_install_locked_validates_freshness(

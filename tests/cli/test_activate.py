@@ -16,6 +16,8 @@ from conda_workspaces.exceptions import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from tests.conftest import CreateWorkspaceEnv
+
 _ACTIVATE_DEFAULTS = {"file": None, "environment": "default"}
 
 
@@ -24,13 +26,12 @@ def _make_args(**kwargs) -> argparse.Namespace:
 
 
 def test_activate_prints_command(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    # Fake-install the default env
-    meta = pixi_workspace / ".conda" / "envs" / "default" / "conda-meta"
-    meta.mkdir(parents=True)
-    (meta / "history").write_text("", encoding="utf-8")
+    tmp_workspace_env(pixi_workspace, "default")
 
     printed: list[str] = []
     monkeypatch.setattr(

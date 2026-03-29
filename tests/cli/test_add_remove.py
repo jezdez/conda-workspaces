@@ -89,8 +89,16 @@ def test_add_conda_deps_to_pixi_toml(
         assert doc["dependencies"][name] == version
 
 
-def test_add_to_feature(pixi_toml: Path) -> None:
-    args = _make_args(file=pixi_toml, specs=["coverage"], feature="test")
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"feature": "test"},
+        {"environment": "test"},
+    ],
+    ids=["via-feature", "via-environment"],
+)
+def test_add_to_feature(pixi_toml: Path, kwargs: dict) -> None:
+    args = _make_args(file=pixi_toml, specs=["coverage"], **kwargs)
     execute_add(args)
 
     doc = tomlkit.loads(pixi_toml.read_text(encoding="utf-8"))
@@ -111,15 +119,6 @@ def test_add_to_pyproject(pyproject_toml: Path) -> None:
 
     doc = tomlkit.loads(pyproject_toml.read_text(encoding="utf-8"))
     assert doc["tool"]["pixi"]["dependencies"]["numpy"] == ">=1.24"
-
-
-def test_add_environment_maps_to_feature(pixi_toml: Path) -> None:
-    """--environment targets the matching feature name."""
-    args = _make_args(file=pixi_toml, specs=["coverage"], environment="test")
-    execute_add(args)
-
-    doc = tomlkit.loads(pixi_toml.read_text(encoding="utf-8"))
-    assert doc["feature"]["test"]["dependencies"]["coverage"] == "*"
 
 
 @pytest.mark.parametrize(
@@ -247,32 +246,32 @@ name = "no-tool"
     assert "No matching" in capsys.readouterr().out
 
 
-def test_add_environment_auto_creates_env_entry(pixi_toml: Path) -> None:
-    """Adding to an undefined environment auto-creates the env entry."""
-    args = _make_args(file=pixi_toml, specs=["numpy"], environment="newenv")
-    result = execute_add(args)
-    assert result == 0
-
-    doc = tomlkit.loads(pixi_toml.read_text(encoding="utf-8"))
-    assert doc["feature"]["newenv"]["dependencies"]["numpy"] == "*"
-    assert "newenv" in doc["environments"]
-    env_entry = doc["environments"]["newenv"]
-    assert env_entry["features"] == ["newenv"]
-
-
-def test_add_environment_auto_creates_env_entry_pyproject(
-    pyproject_toml: Path,
+@pytest.mark.parametrize(
+    "fixture_attr, root_keys",
+    [
+        ("pixi_toml", ()),
+        ("pyproject_toml", ("tool", "pixi")),
+    ],
+    ids=["pixi-toml", "pyproject-toml"],
+)
+def test_add_environment_auto_creates_env_entry(
+    fixture_attr: str,
+    root_keys: tuple[str, ...],
+    request: pytest.FixtureRequest,
 ) -> None:
-    """Adding to an undefined environment in pyproject.toml auto-creates it."""
-    args = _make_args(file=pyproject_toml, specs=["numpy"], environment="newenv")
+    """Adding to an undefined environment auto-creates the env entry."""
+    path = request.getfixturevalue(fixture_attr)
+    args = _make_args(file=path, specs=["numpy"], environment="newenv")
     result = execute_add(args)
     assert result == 0
 
-    doc = tomlkit.loads(pyproject_toml.read_text(encoding="utf-8"))
-    assert doc["tool"]["pixi"]["feature"]["newenv"]["dependencies"]["numpy"] == "*"
-    assert "newenv" in doc["tool"]["pixi"]["environments"]
-    env_entry = doc["tool"]["pixi"]["environments"]["newenv"]
-    assert env_entry["features"] == ["newenv"]
+    doc = tomlkit.loads(path.read_text(encoding="utf-8"))
+    root = doc
+    for key in root_keys:
+        root = root[key]
+    assert root["feature"]["newenv"]["dependencies"]["numpy"] == "*"
+    assert "newenv" in root["environments"]
+    assert root["environments"]["newenv"]["features"] == ["newenv"]
 
 
 def test_add_environment_existing_env_no_duplicate(pixi_toml: Path) -> None:
@@ -289,23 +288,23 @@ def test_add_environment_existing_env_no_duplicate(pixi_toml: Path) -> None:
     assert "test" in doc2["environments"]
 
 
-def test_remove_prints_location_default(
-    pixi_toml: Path, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(
+    "specs, extra_kwargs, expected_text",
+    [
+        (["python"], {}, "default"),
+        (["pytest"], {"feature": "test"}, "feature 'test'"),
+    ],
+    ids=["default", "feature"],
+)
+def test_remove_prints_location(
+    pixi_toml: Path,
+    capsys: pytest.CaptureFixture[str],
+    specs: list[str],
+    extra_kwargs: dict,
+    expected_text: str,
 ) -> None:
-    """Remove success message includes 'default' for default deps."""
-    args = _make_args(file=pixi_toml, specs=["python"])
+    args = _make_args(file=pixi_toml, specs=specs, **extra_kwargs)
     execute_remove(args)
     out = capsys.readouterr().out
-    assert "default" in out
-    assert "Removed 1" in out
-
-
-def test_remove_prints_location_feature(
-    pixi_toml: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Remove success message includes feature name."""
-    args = _make_args(file=pixi_toml, specs=["pytest"], feature="test")
-    execute_remove(args)
-    out = capsys.readouterr().out
-    assert "feature 'test'" in out
+    assert expected_text in out
     assert "Removed 1" in out

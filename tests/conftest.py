@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+pytest_plugins = ["conda.testing.fixtures"]
+
+from contextlib import ExitStack
+from typing import TYPE_CHECKING, Protocol
 
 import pytest
 
@@ -15,7 +18,18 @@ from conda_workspaces.models import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
+
+    from conda.testing.fixtures import TmpEnvFixture
+
+
+class CreateWorkspaceEnv(Protocol):
+    """Callable signature for the tmp_workspace_env factory."""
+
+    def __call__(
+        self, workspace: Path, name: str, *, pkg_count: int = 0
+    ) -> Path: ...
 
 
 @pytest.fixture
@@ -116,3 +130,28 @@ def sample_config() -> WorkspaceConfig:
         root="/tmp/test-project",
         manifest_path="/tmp/test-project/pixi.toml",
     )
+
+
+@pytest.fixture
+def tmp_workspace_env(tmp_env: TmpEnvFixture) -> Iterator[CreateWorkspaceEnv]:
+    """Factory fixture: creates a shallow conda environment inside a workspace.
+
+    Delegates to conda's ``tmp_env(shallow=True)`` to create the
+    environment at the workspace-relative ``.conda/envs/<name>/`` path.
+
+    Usage: ``prefix = tmp_workspace_env(workspace, "default", pkg_count=3)``
+    """
+    stack = ExitStack()
+
+    def _create(workspace: Path, name: str, *, pkg_count: int = 0) -> Path:
+        prefix = stack.enter_context(
+            tmp_env(shallow=True, prefix=workspace / ".conda" / "envs" / name)
+        )
+        for i in range(pkg_count):
+            (prefix / "conda-meta" / f"pkg-{i}.json").write_text(
+                "{}", encoding="utf-8"
+            )
+        return prefix
+
+    with stack:
+        yield _create

@@ -13,6 +13,8 @@ from conda_workspaces.cli.info import execute_info
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from tests.conftest import CreateWorkspaceEnv
+
 _INFO_DEFAULTS = {"file": None, "environment": None, "json": False}
 
 
@@ -71,13 +73,10 @@ def test_info_installed_env(
     pixi_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    meta = pixi_workspace / ".conda" / "envs" / "default" / "conda-meta"
-    meta.mkdir(parents=True)
-    (meta / "history").write_text("", encoding="utf-8")
-    for i in range(3):
-        (meta / f"pkg-{i}.json").write_text("{}", encoding="utf-8")
+    tmp_workspace_env(pixi_workspace, "default", pkg_count=3)
 
     args = _make_args(environment="default")
     execute_info(args)

@@ -121,8 +121,13 @@ def test_parse_conda_deps(raw, expected_name):
     assert isinstance(deps[expected_name], MatchSpec)
 
 
-def test_parse_conda_deps_empty():
-    assert _parse_conda_deps({}) == {}
+@pytest.mark.parametrize(
+    "func",
+    [_parse_conda_deps, _parse_pypi_deps],
+    ids=["conda", "pypi"],
+)
+def test_parse_deps_empty(func):
+    assert func({}) == {}
 
 
 @pytest.mark.parametrize(
@@ -138,10 +143,6 @@ def test_parse_pypi_deps(raw, key):
     deps = _parse_pypi_deps(raw)
     assert key in deps
     assert deps[key].name == key
-
-
-def test_parse_pypi_deps_empty():
-    assert _parse_pypi_deps({}) == {}
 
 
 @pytest.mark.parametrize(

@@ -161,10 +161,10 @@ def test_init_default_channels(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     assert doc["workspace"]["channels"] == ["conda-forge"]
 
 
-def test_init_detects_platforms(
+def test_init_auto_detects_single_platform(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """_detect_platforms returns only the current platform."""
+    """With no --platform arg, init auto-detects exactly one platform."""
     monkeypatch.chdir(tmp_path)
     args = _make_args(manifest_format="conda", name="auto-plat", platforms=None)
     execute_init(args)
@@ -197,41 +197,27 @@ def test_init_pyproject_uses_tool_conda(
 
 
 @pytest.mark.parametrize(
-    "fmt, filename",
+    "fmt, filename, ws_path",
     [
-        ("pixi", "pixi.toml"),
-        ("conda", "conda.toml"),
+        ("pixi", "pixi.toml", ("workspace",)),
+        ("conda", "conda.toml", ("workspace",)),
+        ("pyproject", "pyproject.toml", ("tool", "conda", "workspace")),
     ],
-    ids=["pixi-no-version", "conda-no-version"],
+    ids=["pixi", "conda", "pyproject"],
 )
 def test_init_no_version_field(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fmt: str, filename: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fmt: str,
+    filename: str,
+    ws_path: tuple[str, ...],
 ) -> None:
     """init does not include a version field in the generated manifest."""
     monkeypatch.chdir(tmp_path)
     args = _make_args(manifest_format=fmt, name="novr")
     execute_init(args)
     doc = tomlkit.loads((tmp_path / filename).read_text(encoding="utf-8"))
-    assert "version" not in doc.get("workspace", {})
-
-
-def test_init_pyproject_no_version_field(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """init --format pyproject does not include a version in [tool.conda.workspace]."""
-    monkeypatch.chdir(tmp_path)
-    args = _make_args(manifest_format="pyproject", name="novr")
-    execute_init(args)
-    doc = tomlkit.loads((tmp_path / "pyproject.toml").read_text(encoding="utf-8"))
-    assert "version" not in doc["tool"]["conda"]["workspace"]
-
-
-def test_init_auto_detect_single_platform(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """init with no --platform arg creates exactly one platform (auto-detected)."""
-    monkeypatch.chdir(tmp_path)
-    args = _make_args(manifest_format="conda", name="single-plat", platforms=None)
-    execute_init(args)
-    doc = tomlkit.loads((tmp_path / "conda.toml").read_text(encoding="utf-8"))
-    assert len(doc["workspace"]["platforms"]) == 1
+    ws = doc
+    for key in ws_path:
+        ws = ws[key]
+    assert "version" not in ws

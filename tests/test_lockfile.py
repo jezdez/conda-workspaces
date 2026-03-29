@@ -51,15 +51,19 @@ def test_lockfile_path_returns_conda_lock(tmp_path: Path) -> None:
     assert lockfile_path(ctx) == tmp_path / LOCKFILE_NAME
 
 
-def test_lockfile_exists_false(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "create_file, expected",
+    [
+        (False, False),
+        (True, True),
+    ],
+    ids=["missing", "present"],
+)
+def test_lockfile_exists(tmp_path: Path, create_file: bool, expected: bool) -> None:
     ctx = _make_ctx(tmp_path)
-    assert lockfile_exists(ctx) is False
-
-
-def test_lockfile_exists_true(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path)
-    (tmp_path / LOCKFILE_NAME).write_text("version: 1\n", encoding="utf-8")
-    assert lockfile_exists(ctx) is True
+    if create_file:
+        (tmp_path / LOCKFILE_NAME).write_text("version: 1\n", encoding="utf-8")
+    assert lockfile_exists(ctx) is expected
 
 
 def test_record_to_dict(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -18,6 +18,8 @@ from conda_workspaces.exceptions import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from tests.conftest import CreateWorkspaceEnv
+
 _RUN_DEFAULTS = {"file": None, "environment": "default", "cmd": []}
 
 
@@ -89,12 +91,12 @@ def test_run_error(
 
 
 def test_run_strips_double_dash(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    meta = pixi_workspace / ".conda" / "envs" / "default" / "conda-meta"
-    meta.mkdir(parents=True)
-    (meta / "history").write_text("", encoding="utf-8")
+    tmp_workspace_env(pixi_workspace, "default")
 
     recorded_cmds: list[list[str]] = []
     _stub_run_deps(monkeypatch, recorded_cmds=recorded_cmds)
@@ -115,12 +117,14 @@ def test_run_strips_double_dash(
     ids=["success", "nonzero-exit"],
 )
 def test_run_exit_code(
-    pixi_workspace: Path, monkeypatch: pytest.MonkeyPatch, rc: int, cmd: list[str]
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_workspace_env: CreateWorkspaceEnv,
+    rc: int,
+    cmd: list[str],
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
-    meta = pixi_workspace / ".conda" / "envs" / "default" / "conda-meta"
-    meta.mkdir(parents=True)
-    (meta / "history").write_text("", encoding="utf-8")
+    tmp_workspace_env(pixi_workspace, "default")
 
     _stub_run_deps(monkeypatch, rc=rc)
 

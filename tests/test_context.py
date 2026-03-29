@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -13,6 +14,9 @@ from conda_workspaces.models import (
     Feature,
     WorkspaceConfig,
 )
+
+if TYPE_CHECKING:
+    from tests.conftest import CreateWorkspaceEnv
 
 
 @pytest.fixture
@@ -128,11 +132,12 @@ def test_env_prefix(config: WorkspaceConfig, env_name: str) -> None:
     ids=["exists", "missing"],
 )
 def test_env_exists(
-    config: WorkspaceConfig, has_conda_meta: bool, expected: bool
+    config: WorkspaceConfig,
+    has_conda_meta: bool,
+    expected: bool,
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
     ctx = WorkspaceContext(config)
-    prefix = ctx.env_prefix("default")
     if has_conda_meta:
-        (prefix / "conda-meta").mkdir(parents=True)
-        (prefix / "conda-meta" / "history").write_text("", encoding="utf-8")
+        tmp_workspace_env(ctx.root, "default")
     assert ctx.env_exists("default") is expected

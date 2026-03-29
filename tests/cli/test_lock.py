@@ -23,10 +23,21 @@ def _make_args(**kwargs) -> argparse.Namespace:
     return argparse.Namespace(**{**_LOCK_DEFAULTS, **kwargs})
 
 
-def test_lock_single_env(
+@pytest.mark.parametrize(
+    "env_arg, expected_keys, output_fragment",
+    [
+        ("default", {"default"}, "Lockfile written to"),
+        (None, {"default", "test"}, "2 environment(s) locked"),
+    ],
+    ids=["single-env", "all-envs"],
+)
+def test_lock_envs(
     pixi_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    env_arg: str | None,
+    expected_keys: set[str],
+    output_fragment: str,
 ) -> None:
     monkeypatch.chdir(pixi_workspace)
 
@@ -39,11 +50,11 @@ def test_lock_single_env(
         )[1],
     )
 
-    result = execute_lock(_make_args(environment="default"))
+    result = execute_lock(_make_args(environment=env_arg))
     assert result == 0
     assert len(lock_calls) == 1
-    assert "default" in lock_calls[0]
-    assert "Lockfile written to" in capsys.readouterr().out
+    assert set(lock_calls[0].keys()) == expected_keys
+    assert output_fragment in capsys.readouterr().out
 
 
 def test_lock_unknown_env(
@@ -54,27 +65,3 @@ def test_lock_unknown_env(
 
     with pytest.raises(EnvironmentNotFoundError):
         execute_lock(_make_args(environment="nonexistent"))
-
-
-def test_lock_all_envs(
-    pixi_workspace: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    monkeypatch.chdir(pixi_workspace)
-
-    lock_calls: list[dict] = []
-    monkeypatch.setattr(
-        "conda_workspaces.cli.lock.generate_lockfile",
-        lambda ctx, resolved_envs: (
-            lock_calls.append(resolved_envs),
-            pixi_workspace / "conda.lock",
-        )[1],
-    )
-
-    result = execute_lock(_make_args())
-    assert result == 0
-    assert len(lock_calls) == 1
-    assert set(lock_calls[0].keys()) == {"default", "test"}
-    out = capsys.readouterr().out
-    assert "2 environment(s) locked" in out

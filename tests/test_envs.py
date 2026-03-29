@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -10,6 +9,8 @@ import pytest
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from tests.conftest import CreateWorkspaceEnv
 
 from conda_workspaces.context import WorkspaceContext
 from conda_workspaces.envs import (
@@ -48,22 +49,12 @@ def workspace(tmp_path: Path) -> WorkspaceContext:
     return WorkspaceContext(config)
 
 
-def _make_fake_env(ctx: WorkspaceContext, name: str, pkg_count: int = 0) -> Path:
-    """Create a fake installed environment with optional package jsons."""
-    prefix = ctx.env_prefix(name)
-    meta = prefix / "conda-meta"
-    meta.mkdir(parents=True)
-    (meta / "history").write_text("", encoding="utf-8")
-    for i in range(pkg_count):
-        content = json.dumps({"name": f"pkg-{i}"})
-        (meta / f"pkg-{i}.json").write_text(content, encoding="utf-8")
-    return prefix
-
-
 def test_remove_environment(
-    workspace: WorkspaceContext, monkeypatch: pytest.MonkeyPatch
+    workspace: WorkspaceContext,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
-    _make_fake_env(workspace, "default")
+    tmp_workspace_env(workspace.root, "default")
     assert workspace.env_exists("default")
 
     monkeypatch.setattr("conda_workspaces.envs.unregister_env", lambda path: None)
@@ -80,10 +71,12 @@ def test_remove_environment_nonexistent(
 
 
 def test_clean_all(
-    workspace: WorkspaceContext, monkeypatch: pytest.MonkeyPatch
+    workspace: WorkspaceContext,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
-    _make_fake_env(workspace, "default")
-    _make_fake_env(workspace, "test")
+    tmp_workspace_env(workspace.root, "default")
+    tmp_workspace_env(workspace.root, "test")
     assert workspace.envs_dir.is_dir()
 
     monkeypatch.setattr("conda_workspaces.envs.unregister_env", lambda path: None)
@@ -106,16 +99,21 @@ def test_clean_all_no_envs_dir(workspace: WorkspaceContext) -> None:
     ids=["empty", "single", "sorted-multiple"],
 )
 def test_list_installed_environments(
-    workspace: WorkspaceContext, env_names: list[str], expected: list[str]
+    workspace: WorkspaceContext,
+    env_names: list[str],
+    expected: list[str],
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
     for name in env_names:
-        _make_fake_env(workspace, name)
+        tmp_workspace_env(workspace.root, name)
     assert list_installed_environments(workspace) == expected
 
 
-def test_list_installed_ignores_non_conda_dirs(workspace: WorkspaceContext) -> None:
+def test_list_installed_ignores_non_conda_dirs(
+    workspace: WorkspaceContext, tmp_workspace_env: CreateWorkspaceEnv
+) -> None:
     """Directories without conda-meta should be excluded."""
-    _make_fake_env(workspace, "real")
+    tmp_workspace_env(workspace.root, "real")
     (workspace.envs_dir / "not-an-env").mkdir(parents=True)
     assert list_installed_environments(workspace) == ["real"]
 
@@ -138,9 +136,10 @@ def test_get_environment_info(
     installed: bool,
     pkg_count: int,
     expect_packages: bool,
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
     if installed:
-        _make_fake_env(workspace, "default", pkg_count=pkg_count)
+        tmp_workspace_env(workspace.root, "default", pkg_count=pkg_count)
 
     info = get_environment_info(workspace, "default")
     assert info["name"] == "default"
@@ -254,12 +253,13 @@ def test_install_transaction_outcomes(
 
 
 def test_install_force_reinstall(
-    workspace: WorkspaceContext, monkeypatch: pytest.MonkeyPatch
+    workspace: WorkspaceContext,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
     from conda_workspaces.resolver import ResolvedEnvironment
 
-    # Create a pre-existing environment
-    _make_fake_env(workspace, "default")
+    tmp_workspace_env(workspace.root, "default")
     assert workspace.env_exists("default")
 
     txn = FakeTransaction()
@@ -279,12 +279,14 @@ def test_install_force_reinstall(
 
 
 def test_install_existing_env_uses_freeze(
-    workspace: WorkspaceContext, monkeypatch: pytest.MonkeyPatch
+    workspace: WorkspaceContext,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
     """Updating an existing env passes UpdateModifier.FREEZE_INSTALLED."""
     from conda_workspaces.resolver import ResolvedEnvironment
 
-    _make_fake_env(workspace, "default")
+    tmp_workspace_env(workspace.root, "default")
 
     recorded_kwargs: dict = {}
 
