@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+from rich.console import Console
+from rich.table import Table
+
 from ..context import WorkspaceContext
 from ..envs import get_environment_info
 from ..parsers import detect_and_parse
@@ -16,23 +19,27 @@ if TYPE_CHECKING:
     from ..models import WorkspaceConfig
 
 
-def execute_info(args: argparse.Namespace) -> int:
+def execute_info(args: argparse.Namespace, *, console: Console | None = None) -> int:
     """Show workspace overview or per-environment details."""
     manifest_path = getattr(args, "file", None)
     _, config = detect_and_parse(manifest_path)
     ctx = WorkspaceContext(config)
 
+    if console is None:
+        console = Console()
+
     env_name = getattr(args, "environment", None)
     json_output = getattr(args, "json", False)
 
     if env_name is None:
-        return _show_workspace_info(config, ctx, json_output)
-    return _show_env_info(config, ctx, env_name, json_output)
+        return _show_workspace_info(config, ctx, console, json_output)
+    return _show_env_info(config, ctx, env_name, console, json_output)
 
 
 def _show_workspace_info(
     config: WorkspaceConfig,
     ctx: WorkspaceContext,
+    console: Console,
     json_output: bool,
 ) -> int:
     """Show workspace-level overview."""
@@ -46,14 +53,18 @@ def _show_workspace_info(
     }
 
     if json_output:
-        print(json.dumps(info, indent=2))
+        console.print_json(json.dumps(info))
     else:
-        print(f"Manifest:     {info['manifest']}")
-        print(f"Name:         {info['name']}")
-        print(f"Channels:     {', '.join(info['channels']) or '(none)'}")
-        print(f"Platforms:    {', '.join(info['platforms']) or '(all)'}")
-        print(f"Environments: {', '.join(info['environments'])}")
-        print(f"Features:     {', '.join(info['features'])}")
+        table = Table(show_header=False, show_edge=False, pad_edge=False)
+        table.add_column("Key", style="bold")
+        table.add_column("Value")
+        table.add_row("Manifest", str(info["manifest"]))
+        table.add_row("Name", info["name"])
+        table.add_row("Channels", ", ".join(info["channels"]) or "(none)")
+        table.add_row("Platforms", ", ".join(info["platforms"]) or "(all)")
+        table.add_row("Environments", ", ".join(info["environments"]))
+        table.add_row("Features", ", ".join(info["features"]) or "(none)")
+        console.print(table)
 
     return 0
 
@@ -62,6 +73,7 @@ def _show_env_info(
     config: WorkspaceConfig,
     ctx: WorkspaceContext,
     env_name: str,
+    console: Console,
     json_output: bool,
 ) -> int:
     """Show details for a single environment."""
@@ -74,7 +86,7 @@ def _show_env_info(
         "installed": install_info["exists"],
         "channels": [ch.canonical_name for ch in resolved.channels],
         "platforms": resolved.platforms,
-        "solve_group": resolved.solve_group,
+        "channel_priority": resolved.channel_priority,
         "conda_dependencies": {
             name: dep.conda_build_form()
             for name, dep in resolved.conda_dependencies.items()
@@ -88,26 +100,30 @@ def _show_env_info(
         info["packages_installed"] = install_info.get("packages", 0)
 
     if json_output:
-        print(json.dumps(info, indent=2))
+        console.print_json(json.dumps(info))
     else:
-        print(f"Environment: {info['name']}")
-        print(f"Prefix:      {info['prefix']}")
-        print(f"Installed:   {'yes' if info['installed'] else 'no'}")
+        table = Table(show_header=False, show_edge=False, pad_edge=False)
+        table.add_column("Key", style="bold")
+        table.add_column("Value")
+        table.add_row("Environment", info["name"])
+        table.add_row("Prefix", info["prefix"])
+        table.add_row("Installed", "yes" if info["installed"] else "no")
         if info["installed"]:
-            print(f"Packages:    {info.get('packages_installed', '?')}")
-        print(f"Channels:    {', '.join(info['channels']) or '(none)'}")
-        print(f"Platforms:   {', '.join(info['platforms']) or '(all)'}")
-        if info["solve_group"]:
-            print(f"Solve group: {info['solve_group']}")
+            table.add_row("Packages", str(info.get("packages_installed", "?")))
+        table.add_row("Channels", ", ".join(info["channels"]) or "(none)")
+        table.add_row("Platforms", ", ".join(info["platforms"]) or "(all)")
+        if info["channel_priority"]:
+            table.add_row("Channel priority", info["channel_priority"])
+        console.print(table)
 
         if info["conda_dependencies"]:
-            print("\nConda dependencies:")
-            for name, spec in sorted(info["conda_dependencies"].items()):
-                print(f"  - {spec}")
+            console.print("\nConda dependencies:")
+            for _name, spec in sorted(info["conda_dependencies"].items()):
+                console.print(f"  {spec}")
 
         if info["pypi_dependencies"]:
-            print("\nPyPI dependencies:")
-            for name, spec in sorted(info["pypi_dependencies"].items()):
-                print(f"  - {spec}")
+            console.print("\nPyPI dependencies:")
+            for _name, spec in sorted(info["pypi_dependencies"].items()):
+                console.print(f"  {spec}")
 
     return 0

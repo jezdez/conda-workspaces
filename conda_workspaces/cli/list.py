@@ -5,6 +5,10 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+from conda.core.envs_manager import PrefixData
+from rich.console import Console
+from rich.table import Table
+
 from ..context import WorkspaceContext
 from ..envs import list_installed_environments
 from ..exceptions import EnvironmentNotFoundError, EnvironmentNotInstalledError
@@ -16,31 +20,33 @@ if TYPE_CHECKING:
     from ..models import WorkspaceConfig
 
 
-def execute_list(args: argparse.Namespace) -> int:
+def execute_list(args: argparse.Namespace, *, console: Console | None = None) -> int:
     """List packages in an environment, or environments in the workspace."""
     manifest_path = getattr(args, "file", None)
     _, config = detect_and_parse(manifest_path)
     ctx = WorkspaceContext(config)
 
+    if console is None:
+        console = Console()
+
     json_output = getattr(args, "json", False)
 
     if getattr(args, "envs", False):
         installed_only = getattr(args, "installed", False)
-        return _list_environments(config, ctx, json_output, installed_only)
+        return _list_environments(config, ctx, console, json_output, installed_only)
 
     env_name = getattr(args, "environment", "default")
-    return _list_packages(config, ctx, env_name, json_output)
+    return _list_packages(config, ctx, env_name, console, json_output)
 
 
 def _list_packages(
     config: WorkspaceConfig,
     ctx: WorkspaceContext,
     env_name: str,
+    console: Console,
     json_output: bool,
 ) -> int:
     """List installed packages in an environment."""
-    from conda.core.envs_manager import PrefixData
-
     if env_name not in config.environments:
         raise EnvironmentNotFoundError(env_name, list(config.environments.keys()))
 
@@ -52,20 +58,24 @@ def _list_packages(
     records = sorted(pd.iter_records(), key=lambda r: r.name)
 
     if json_output:
-        rows = [
-            {"name": r.name, "version": r.version, "build": r.build}
-            for r in records
-        ]
-        print(json.dumps(rows, indent=2))
+        console.print_json(
+            json.dumps([
+                {"name": r.name, "version": r.version, "build": r.build}
+                for r in records
+            ])
+        )
     else:
         if not records:
-            print(f"No packages installed in '{env_name}'.")
+            console.print(f"No packages installed in '{env_name}'.")
             return 0
 
-        print(f"{'Name':<30} {'Version':<20} {'Build'}")
-        print("-" * 70)
+        table = Table(show_edge=False, pad_edge=False)
+        table.add_column("Name")
+        table.add_column("Version")
+        table.add_column("Build")
         for r in records:
-            print(f"{r.name:<30} {r.version:<20} {r.build}")
+            table.add_row(r.name, r.version, r.build)
+        console.print(table)
 
     return 0
 
@@ -73,6 +83,7 @@ def _list_packages(
 def _list_environments(
     config: WorkspaceConfig,
     ctx: WorkspaceContext,
+    console: Console,
     json_output: bool,
     installed_only: bool,
 ) -> int:
@@ -87,23 +98,25 @@ def _list_environments(
             {
                 "name": name,
                 "features": env.features,
-                "solve_group": env.solve_group or "",
                 "installed": name in installed,
             }
         )
 
     if json_output:
-        print(json.dumps(rows, indent=2))
+        console.print_json(json.dumps(rows))
     else:
         if not rows:
-            print("No environments found.")
+            console.print("No environments found.")
             return 0
 
-        print(f"{'Name':<20} {'Features':<30} {'Solve Group':<15} {'Installed'}")
-        print("-" * 75)
+        table = Table(show_edge=False, pad_edge=False)
+        table.add_column("Name")
+        table.add_column("Features")
+        table.add_column("Installed")
         for row in rows:
             feats = ", ".join(row["features"]) if row["features"] else "(default)"  # type: ignore[arg-type]
             status = "yes" if row["installed"] else "no"
-            print(f"{row['name']:<20} {feats:<30} {row['solve_group']:<15} {status}")
+            table.add_row(row["name"], feats, status)  # type: ignore[arg-type]
+        console.print(table)
 
     return 0
