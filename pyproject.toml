@@ -142,3 +142,6 @@ typecheck = "ty check conda_workspaces"
 test = "pytest"
 test-cov = "pytest --cov --cov-report=term-missing --cov-report=html"
 docs = "sphinx-build -b dirhtml docs docs/_build/dirhtml"
+[tool.pixi.tasks.demos]
+cmd = """bash -c 'if [ -n "$1" ]; then vhs "demos/$1.tape"; else for tape in demos/*.tape; do [[ "$(basename "$tape")" == _* ]] && continue; vhs "$tape"; done; fi' -- {{ name }}"""
+args = [{ arg = "name", default = "" }]

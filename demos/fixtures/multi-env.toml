@@ -1,0 +1,22 @@
+[workspace]
+name = "my-project"
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64"]
+
+[dependencies]
+python = ">=3.12"
+
+[feature.docs.dependencies]
+sphinx = "*"
+
+[feature.lint.dependencies]
+ruff = "*"
+
+[feature.test.dependencies]
+pytest = "*"
+
+[environments]
+test = ["test"]
+lint = ["lint"]
+docs = ["docs"]
+dev = ["test", "lint", "docs"]
