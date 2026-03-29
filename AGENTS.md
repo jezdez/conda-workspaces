@@ -33,12 +33,16 @@
 
 - Inline (lazy) imports are reserved for performance-critical paths.
   Acceptable cases: `plugin.py` hooks (loaded on every `conda`
-  invocation), `cli/main.py` subcommand dispatch (only the chosen
-  handler is loaded), `context.py` property methods (lazy by design),
-  and `parsers/toml.py` where `CondaTomlParser.parse()` delegates to
-  `PixiTomlParser` (breaks a real circular dependency since
-  `pixi_toml` imports helpers from `toml`). Everywhere else, imports
-  belong at the top of the module.
+  invocation), `__main__.py` entry point (defers parser setup until
+  invoked), `cli/main.py` subcommand dispatch (only the chosen
+  handler is loaded), `context.py` methods (lazy by design to keep
+  plugin load under 1 ms), `lockfile.py` solver helpers inside
+  `_solve_for_records` (avoids pulling in heavy solver/envs
+  machinery for lockfile-read operations), and `parsers/toml.py`
+  where `CondaTomlParser.parse()` delegates to `PixiTomlParser`
+  (breaks a real circular dependency since `pixi_toml` imports
+  helpers from `toml`). Everywhere else, imports belong at the top
+  of the module.
 
 ## Dependencies
 
@@ -76,7 +80,13 @@
 
 - Use `pytest.mark.parametrize` extensively. When multiple test cases
   exercise the same logic with different inputs, consolidate them into
-  a single parameterized test.
+  a single parameterized test. Always check whether a new test can be
+  expressed as a new parameter case on an existing test before writing
+  a standalone function.
+
+- After adding or modifying tests, always run the test suite
+  (`pixi run -e test pytest`) and linter (`pixi run ruff check`) to
+  verify the changes pass before considering the work done.
 
 - Shared fixtures belong in `conftest.py` at the appropriate level
   (root `tests/conftest.py` for cross-cutting fixtures, subdirectory
