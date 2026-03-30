@@ -7,7 +7,7 @@ Hide
 Type `eval "$(pixi shell-hook -s bash -e dev)"`
 Enter
 Wait /\)/
-Type `export PS1="\[\033[1;32m\]$\[\033[0m\] "`
+Type `export PS1="$DEMO_PS1" && mkdir -p /tmp/.demo-home && echo 'PS1="$ "' > /tmp/.demo-home/.bash_profile && export HOME=/tmp/.demo-home`
 Enter
 Wait /\$/
 Type `FIXTURES=$(pwd)/demos/fixtures`
@@ -27,42 +27,35 @@ Enter
 Wait /\$/
 Show
 
-Type "# Drop into an interactive shell"
+Type "# Spawn an interactive shell in a workspace env"
 Enter
 Sleep 500ms
 
+Type@80ms "bat conda.toml"
+Enter
+Wait /\$/
+Sleep 3s
+
 Type@80ms "conda workspace shell -e default"
-Hide
 Enter
-Wait /\$/
-Type `export PS1="\[\033[1;32m\](default) $\[\033[0m\] "`
-Enter
-Wait /\$/
-Type "clear"
-Enter
-Wait /\$/
-Show
+Wait /\(default\)/
+Sleep 1s
 
 Type@80ms "python --version"
 Enter
-Wait /\$/
-Sleep 1s
+Wait /\(default\)/
+Sleep 2s
 
 Type@80ms "which python"
 Enter
-Wait /\$/
+Wait /\(default\)/
 Sleep 2s
 
-Type@80ms "exit"
-Enter
-Wait /\$/
-Sleep 1s
-
-Type "# Or run a one-shot command"
+Type "# Exit to return to the parent shell"
 Enter
 Sleep 500ms
 
-Type@80ms `conda workspace shell -e default -- python -c "print('Hello from the workspace!')"`
+Type@80ms "exit"
 Enter
 Wait /\$/
 Sleep 3s

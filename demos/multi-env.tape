@@ -7,7 +7,7 @@ Hide
 Type `eval "$(pixi shell-hook -s bash -e dev)"`
 Enter
 Wait /\)/
-Type `export PS1="\[\033[1;32m\]$\[\033[0m\] "`
+Type `export PS1="$DEMO_PS1" && mkdir -p /tmp/.demo-home && echo 'PS1="$ "' > /tmp/.demo-home/.bash_profile && export HOME=/tmp/.demo-home`
 Enter
 Wait /\$/
 Type `FIXTURES=$(pwd)/demos/fixtures`
@@ -28,7 +28,7 @@ Type "# One manifest with multiple environments"
 Enter
 Sleep 500ms
 
-Type@80ms "bat -pp conda.toml"
+Type@80ms "bat conda.toml"
 Enter
 Wait /\$/
 Sleep 3s
@@ -65,7 +65,7 @@ Type "# Run tools in the right environment"
 Enter
 Sleep 500ms
 
-Type@80ms "conda workspace shell -e lint -- ruff --version"
+Type@80ms "conda workspace run -e lint -- ruff --version"
 Enter
 Wait /\$/
 Sleep 3s

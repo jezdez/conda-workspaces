@@ -7,7 +7,7 @@ Hide
 Type `eval "$(pixi shell-hook -s bash -e dev)"`
 Enter
 Wait /\)/
-Type `export PS1="\[\033[1;32m\]$\[\033[0m\] "`
+Type `export PS1="$DEMO_PS1" && mkdir -p /tmp/.demo-home && echo 'PS1="$ "' > /tmp/.demo-home/.bash_profile && export HOME=/tmp/.demo-home`
 Enter
 Wait /\$/
 Type "rm -rf /tmp/my-project && mkdir -p /tmp/my-project && cd /tmp/my-project"
@@ -41,7 +41,7 @@ Enter
 Wait /\$/
 Sleep 1s
 
-Type@80ms "bat -pp conda.toml"
+Type@80ms "bat conda.toml"
 Enter
 Wait /\$/
 Sleep 3s
@@ -68,7 +68,7 @@ Type "# Run a command in the test environment"
 Enter
 Sleep 500ms
 
-Type@80ms `conda workspace shell -e test -- python -c "import numpy; print(numpy.__version__)"`
+Type@80ms `conda workspace run -e test -- python -c "import numpy; print(numpy.__version__)"`
 Enter
 Wait /\$/
 Sleep 3s
