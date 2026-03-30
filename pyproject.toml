@@ -137,13 +137,19 @@ test = {features = ["test"], solve-group = "default"}
 docs = {features = ["docs"], solve-group = "default"}
 
 [tool.pixi.tasks]
-lint = "ruff check conda_workspaces tests"
-format = "ruff format conda_workspaces tests"
-format-check = "ruff format --check conda_workspaces tests"
-typecheck = "ty check conda_workspaces"
-test = "pytest"
-test-cov = "pytest --cov --cov-report=term-missing --cov-report=html"
-docs = "sphinx-build -b dirhtml docs docs/_build/dirhtml"
+lint = { cmd = "ruff check conda_workspaces tests", description = "Check code style" }
+format = { cmd = "ruff format conda_workspaces tests", description = "Auto-format code" }
+format-check = { cmd = "ruff format --check conda_workspaces tests", description = "Verify formatting" }
+typecheck = { cmd = "ty check conda_workspaces", description = "Run type checker" }
+test = { cmd = "pytest", description = "Run test suite" }
+test-cov = { cmd = "pytest --cov --cov-report=term-missing --cov-report=html", description = "Tests with coverage" }
+docs = { cmd = "sphinx-build -b dirhtml docs docs/_build/dirhtml", description = "Build documentation" }
+
+[tool.pixi.tasks.check]
+depends-on = ["lint", "format-check", "typecheck"]
+description = "Run all checks"
+
 [tool.pixi.tasks.demos]
 cmd = """bash -c 'if [ -n "$1" ]; then vhs "demos/$1.tape"; else for tape in demos/*.tape; do [[ "$(basename "$tape")" == _* ]] && continue; vhs "$tape"; done; fi' -- {{ name }}"""
 args = [{ arg = "name", default = "" }]
+description = "Record demo GIFs"
