@@ -12,6 +12,27 @@ from conda.cli.helpers import (
     add_output_and_prompt_options,
     add_parser_help,
 )
+from conda.exceptions import CondaError, CondaSystemExit, DryRunExit
+
+
+def _handle_error(exc: CondaError) -> int:
+    """Render a CondaError with Rich and return its exit code.
+
+    In JSON or debug mode, re-raises so conda's own handler takes over
+    (preserving tracebacks and structured JSON output).
+    """
+    from conda.base.context import context as conda_context
+
+    if conda_context.json or conda_context.debug:
+        raise exc
+
+    from rich.console import Console
+
+    from . import status
+
+    console = Console(stderr=True, highlight=False)
+    status.print_error(console, exc)
+    return getattr(exc, "return_code", 1)
 
 
 def generate_workspace_parser() -> argparse.ArgumentParser:
@@ -293,6 +314,15 @@ def execute_workspace(args: argparse.Namespace) -> int:
         generate_workspace_parser().print_help()
         return 0
 
+    try:
+        return _dispatch_workspace(args, subcmd)
+    except (CondaSystemExit, DryRunExit):
+        raise
+    except CondaError as exc:
+        return _handle_error(exc)
+
+
+def _dispatch_workspace(args: argparse.Namespace, subcmd: str) -> int:
     if subcmd == "init":
         from .workspace.init import execute_init
 
@@ -312,7 +342,6 @@ def execute_workspace(args: argparse.Namespace) -> int:
     elif subcmd == "envs":
         from .workspace.list import execute_list
 
-        # Set flags to simulate the old --envs behavior
         args.envs = True
         return execute_list(args)
     elif subcmd == "info":
@@ -471,6 +500,15 @@ def execute_task(args: argparse.Namespace) -> int:
             generate_task_parser().print_help()
             return 0
 
+    try:
+        return _dispatch_task(args, subcmd)
+    except (CondaSystemExit, DryRunExit):
+        raise
+    except CondaError as exc:
+        return _handle_error(exc)
+
+
+def _dispatch_task(args: argparse.Namespace, subcmd: str) -> int:
     if subcmd == "run":
         from .task.run import execute_run
 

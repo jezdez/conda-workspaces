@@ -11,7 +11,29 @@ if TYPE_CHECKING:
 
 
 class CondaWorkspacesError(CondaError):
-    """Base exception for all conda-workspaces errors."""
+    """Base exception for all conda-workspaces errors.
+
+    Subclasses provide *hints* — actionable suggestions shown below
+    the main error message.  The full ``str(exc)`` still contains
+    everything (for conda's fallback handler), but the Rich renderer
+    in ``main.py`` uses ``error_message`` and ``hints`` separately.
+    """
+
+    error_message: str
+    hints: list[str]
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        hints: list[str] | None = None,
+    ) -> None:
+        self.error_message = message
+        self.hints = hints or []
+        full = message
+        if self.hints:
+            full += "\n" + "\n".join(self.hints)
+        super().__init__(full)
 
 
 class WorkspaceNotFoundError(CondaWorkspacesError):
@@ -20,9 +42,12 @@ class WorkspaceNotFoundError(CondaWorkspacesError):
     def __init__(self, search_dir: str | Path) -> None:
         self.search_dir = search_dir
         super().__init__(
-            f"No workspace manifest found in '{search_dir}' or any parent directory.\n"
-            "Create a conda.toml, pixi.toml, or pyproject.toml "
-            "(with [tool.conda.workspace]) to define a workspace."
+            f"No workspace manifest found in '{search_dir}'"
+            " or any parent directory.",
+            hints=[
+                "Create a conda.toml, pixi.toml, or pyproject.toml"
+                " (with [tool.conda.workspace]) to define a workspace.",
+            ],
         )
 
 
@@ -41,10 +66,15 @@ class EnvironmentNotFoundError(CondaWorkspacesError):
     def __init__(self, name: str, available: list[str]) -> None:
         self.name = name
         self.available = available
-        hint = ""
+        hints = []
         if available:
-            hint = f"\nAvailable environments: {', '.join(sorted(available))}"
-        super().__init__(f"Environment '{name}' is not defined in the workspace.{hint}")
+            hints.append(
+                f"Available environments: {', '.join(sorted(available))}"
+            )
+        super().__init__(
+            f"Environment '{name}' is not defined in the workspace.",
+            hints=hints,
+        )
 
 
 class EnvironmentNotInstalledError(CondaWorkspacesError):
@@ -53,8 +83,8 @@ class EnvironmentNotInstalledError(CondaWorkspacesError):
     def __init__(self, name: str) -> None:
         self.name = name
         super().__init__(
-            f"Environment '{name}' is not installed.\n"
-            f"Run 'conda workspace install -e {name}' first."
+            f"Environment '{name}' is not installed.",
+            hints=[f"Run 'conda workspace install -e {name}' first."],
         )
 
 
@@ -64,7 +94,8 @@ class ManifestExistsError(CondaWorkspacesError):
     def __init__(self, path: str | Path) -> None:
         self.path = path
         super().__init__(
-            f"'{path}' already exists. Use a different format or location."
+            f"'{path}' already exists.",
+            hints=["Use a different format or location."],
         )
 
 
@@ -75,8 +106,8 @@ class FeatureNotFoundError(CondaWorkspacesError):
         self.feature = feature
         self.environment = environment
         super().__init__(
-            f"Feature '{feature}' referenced by environment '{environment}' "
-            "is not defined in the workspace."
+            f"Feature '{feature}' referenced by environment '{environment}'"
+            " is not defined in the workspace."
         )
 
 
@@ -87,8 +118,10 @@ class PlatformError(CondaWorkspacesError):
         self.platform = platform
         self.available = available
         super().__init__(
-            f"Platform '{platform}' is not supported by this workspace.\n"
-            f"Supported platforms: {', '.join(sorted(available))}"
+            f"Platform '{platform}' is not supported by this workspace.",
+            hints=[
+                f"Supported platforms: {', '.join(sorted(available))}",
+            ],
         )
 
 
@@ -117,9 +150,9 @@ class LockfileNotFoundError(CondaWorkspacesError):
         self.environment = environment
         self.path = path
         super().__init__(
-            f"No lockfile entry found for environment '{environment}' "
-            f"in {path}.\n"
-            f"Run 'conda workspace install' to generate one."
+            f"No lockfile entry found for environment '{environment}'"
+            f" in {path}.",
+            hints=["Run 'conda workspace install' to generate one."],
         )
 
 
@@ -130,10 +163,12 @@ class LockfileStaleError(CondaWorkspacesError):
         self.manifest = manifest
         self.lockfile = lockfile
         super().__init__(
-            f"Lockfile '{lockfile}' is out of date "
-            f"(manifest '{manifest}' has been modified since the last lock).\n"
-            "Run 'conda workspace lock' to update it, "
-            "or use --frozen to install anyway."
+            f"Lockfile '{lockfile}' is out of date"
+            f" (manifest '{manifest}' has been modified since the last lock).",
+            hints=[
+                "Run 'conda workspace lock' to update it,"
+                " or use --frozen to install anyway.",
+            ],
         )
 
 
@@ -141,10 +176,12 @@ class TaskNotFoundError(CondaWorkspacesError):
     """Raised when a referenced task does not exist."""
 
     def __init__(self, task_name: str, available: list[str] | None = None):
-        msg = f"Task '{task_name}' not found."
+        hints = []
         if available:
-            msg += f" Available tasks: {', '.join(sorted(available))}"
-        super().__init__(msg)
+            hints.append(
+                f"Available tasks: {', '.join(sorted(available))}"
+            )
+        super().__init__(f"Task '{task_name}' not found.", hints=hints)
 
 
 class CyclicDependencyError(CondaWorkspacesError):
@@ -174,7 +211,9 @@ class NoTaskFileError(CondaWorkspacesError):
 
     def __init__(self, search_dir: str):
         super().__init__(
-            f"No task file found in '{search_dir}'. "
-            "Create a conda.toml, pixi.toml, or pyproject.toml "
-            "with task definitions."
+            f"No task file found in '{search_dir}'.",
+            hints=[
+                "Create a conda.toml, pixi.toml, or pyproject.toml"
+                " with task definitions.",
+            ],
         )
