@@ -40,8 +40,7 @@ def execute_export(args: argparse.Namespace, *, console: Console | None = None) 
         if not quiet:
             noun = "task" if n == 1 else "tasks"
             console.print(
-                f"[bold cyan]Exported[/bold cyan] {n} {noun}"
-                f" to [bold]{output}[/bold]"
+                f"[bold cyan]Exported[/bold cyan] {n} {noun} to [bold]{output}[/bold]"
             )
     else:
         print(text, end="")

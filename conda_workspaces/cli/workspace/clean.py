@@ -62,8 +62,12 @@ def execute_clean(args: argparse.Namespace, *, console: Console | None = None) -
                 if i > 0:
                     console.print()
                 status.message(
-                    console, "Removing", "environment", name,
-                    style="bold blue", ellipsis=True,
+                    console,
+                    "Removing",
+                    "environment",
+                    name,
+                    style="bold blue",
+                    ellipsis=True,
                 )
             clean_all(ctx)
             for i, name in enumerate(installed):

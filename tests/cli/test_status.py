@@ -90,11 +90,13 @@ def test_class_name_to_label(class_name, expected):
     [
         (
             EnvironmentNotFoundError("dev", ["default", "test"]),
-            "dev", "default",
+            "dev",
+            "default",
         ),
         (
             SolveError("test", "conflict"),
-            "conflict", "dependency specifications",
+            "conflict",
+            "dependency specifications",
         ),
     ],
     ids=["env-not-found", "solve-error"],
@@ -139,18 +141,24 @@ def test_print_error_multi_error_dedup(capsys):
     [
         ("Running", "task", "lint", {}, ["Running", "lint", "task"]),
         (
-            "Installing", "environment", "default",
+            "Installing",
+            "environment",
+            "default",
             {"style": "bold blue"},
             ["[bold blue]Installing[/bold blue]", "default", "environment"],
         ),
         ("Running", "task", "lint", {"ellipsis": True}, ["..."]),
         (
-            "Running", "task", "lint",
+            "Running",
+            "task",
+            "lint",
             {"detail": "echo hello"},
             ["echo hello"],
         ),
         (
-            "Skipped", "task", "lint",
+            "Skipped",
+            "task",
+            "lint",
             {"suffix": "cached"},
             ["(cached)"],
         ),
@@ -200,8 +208,10 @@ def test_message_default_style_applied():
 
     buf = StringIO()
     console = RichConsole(
-        file=buf, highlight=False,
-        force_terminal=True, color_system="truecolor",
+        file=buf,
+        highlight=False,
+        force_terminal=True,
+        color_system="truecolor",
     )
     status.message(console, "Installed", "environment", "default")
     output = buf.getvalue()

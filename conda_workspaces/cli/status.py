@@ -126,8 +126,7 @@ def _class_name_to_label(cls_name: str) -> str:
     words = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", name)
     words = re.sub(r"([a-z])([A-Z])", r"\1 \2", words)
     return " ".join(
-        w if w.isupper() and len(w) > 1 else w.lower()
-        for w in words.split()
+        w if w.isupper() and len(w) > 1 else w.lower() for w in words.split()
     )
 
 
@@ -166,17 +165,11 @@ def print_error(
             msg = _format_error_message(inner)
             if msg not in seen:
                 seen.add(msg)
-                console.print(
-                    f"[bold red]Error:[/bold red] {_escape(msg)}"
-                )
+                console.print(f"[bold red]Error:[/bold red] {_escape(msg)}")
                 for hint in getattr(inner, "hints", []):
-                    console.print(
-                        f"[bold cyan]Hint:[/bold cyan] {_escape(hint)}"
-                    )
+                    console.print(f"[bold cyan]Hint:[/bold cyan] {_escape(hint)}")
     else:
         msg = _format_error_message(exc)
         console.print(f"[bold red]Error:[/bold red] {_escape(msg)}")
         for hint in getattr(exc, "hints", []):
-            console.print(
-                f"[bold cyan]Hint:[/bold cyan] {_escape(hint)}"
-            )
+            console.print(f"[bold cyan]Hint:[/bold cyan] {_escape(hint)}")

@@ -42,8 +42,7 @@ class WorkspaceNotFoundError(CondaWorkspacesError):
     def __init__(self, search_dir: str | Path) -> None:
         self.search_dir = search_dir
         super().__init__(
-            f"No workspace manifest found in '{search_dir}'"
-            " or any parent directory.",
+            f"No workspace manifest found in '{search_dir}' or any parent directory.",
             hints=[
                 "Create a conda.toml, pixi.toml, or pyproject.toml"
                 " (with [tool.conda.workspace]) to define a workspace.",
@@ -71,9 +70,7 @@ class EnvironmentNotFoundError(CondaWorkspacesError):
         self.available = available
         hints = []
         if available:
-            hints.append(
-                f"Available environments: {', '.join(sorted(available))}"
-            )
+            hints.append(f"Available environments: {', '.join(sorted(available))}")
         super().__init__(
             f"Environment '{name}' is not defined in the workspace.",
             hints=hints,
@@ -165,8 +162,7 @@ class LockfileNotFoundError(CondaWorkspacesError):
         self.environment = environment
         self.path = path
         super().__init__(
-            f"No lockfile entry found for environment '{environment}'"
-            f" in {path}.",
+            f"No lockfile entry found for environment '{environment}' in {path}.",
             hints=["Run 'conda workspace install' to generate one."],
         )
 
@@ -193,9 +189,7 @@ class TaskNotFoundError(CondaWorkspacesError):
     def __init__(self, task_name: str, available: list[str] | None = None) -> None:
         hints = []
         if available:
-            hints.append(
-                f"Available tasks: {', '.join(sorted(available))}"
-            )
+            hints.append(f"Available tasks: {', '.join(sorted(available))}")
         super().__init__(f"Task '{task_name}' not found.", hints=hints)
 
 

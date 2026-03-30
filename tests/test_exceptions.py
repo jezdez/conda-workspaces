@@ -140,5 +140,3 @@ def test_error_message_and_hints_separate(exc):
     for hint in exc.hints:
         assert hint in str(exc)
     assert exc.error_message != str(exc) or not exc.hints
-
-

@@ -82,7 +82,10 @@ def _build_dry_run_tree(
 
     def _label(name: str) -> str:
         return status.message_label(
-            "Would run", "task", name, detail=rendered_cmds.get(name),
+            "Would run",
+            "task",
+            name,
+            detail=rendered_cmds.get(name),
         )
 
     def _add_children(parent: Tree, task_name: str, seen: set[str]) -> None:
@@ -219,8 +222,12 @@ def execute_run(args: argparse.Namespace, *, console: Console | None = None) -> 
             ):
                 if not quiet:
                     status.message(
-                        console, "Skipped", "task", name,
-                        style="bold yellow", suffix="cached",
+                        console,
+                        "Skipped",
+                        "task",
+                        name,
+                        style="bold yellow",
+                        suffix="cached",
                     )
                 continue
 
@@ -228,8 +235,12 @@ def execute_run(args: argparse.Namespace, *, console: Console | None = None) -> 
             if task_count > 0:
                 console.print()
             status.message(
-                console, "Running", "task", name,
-                style="bold blue", ellipsis=True,
+                console,
+                "Running",
+                "task",
+                name,
+                style="bold blue",
+                ellipsis=True,
                 detail=cmd if verbose else None,
             )
         task_count += 1
@@ -251,7 +262,11 @@ def execute_run(args: argparse.Namespace, *, console: Console | None = None) -> 
         if exit_code != 0:
             if has_deps and not quiet:
                 status.message(
-                    console, "Failed", "task", name, style="bold yellow",
+                    console,
+                    "Failed",
+                    "task",
+                    name,
+                    style="bold yellow",
                 )
             raise TaskExecutionError(name, exit_code)
 
@@ -346,10 +361,7 @@ def _run_adhoc(
 
     if dry_run:
         if not getattr(args, "quiet", False):
-            console.print(
-                "[bold yellow]Would run[/bold yellow]"
-                f" [dim]{full_cmd}[/dim]"
-            )
+            console.print(f"[bold yellow]Would run[/bold yellow] [dim]{full_cmd}[/dim]")
         return 0
 
     shell = SubprocessShell()

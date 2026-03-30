@@ -40,13 +40,16 @@ def execute_list(args: argparse.Namespace, *, console: Console | None = None) ->
                 entry["alias"] = True
             data[name] = entry
 
-        console.print_json(json.dumps({"tasks": data, "file": str(task_file)}))
+        console.print(
+            json.dumps({"tasks": data, "file": str(task_file)}, indent=2),
+            highlight=False,
+            soft_wrap=True,
+        )
         return 0
 
     if not visible_tasks:
         console.print(
-            f"No tasks defined in {task_file}."
-            " Add tasks with 'conda task add'."
+            f"No tasks defined in {task_file}. Add tasks with 'conda task add'."
         )
         return 0
 

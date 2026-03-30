@@ -26,28 +26,21 @@ def execute_lock(args: argparse.Namespace, *, console: Console | None = None) ->
     if env_name:
         if env_name not in config.environments:
             raise EnvironmentNotFoundError(
-                env_name, list(config.environments.keys()),
+                env_name,
+                list(config.environments.keys()),
             )
         resolved = resolve_environment(config, env_name, ctx.platform)
         console.print(
-            "[bold blue]Updating[/bold blue]"
-            " [bold]conda.lock[/bold][dim]...[/dim]"
+            "[bold blue]Updating[/bold blue] [bold]conda.lock[/bold][dim]...[/dim]"
         )
         generate_lockfile(ctx, {env_name: resolved})
-        console.print(
-            "[bold cyan]Updated[/bold cyan]"
-            " [bold]conda.lock[/bold]"
-        )
+        console.print("[bold cyan]Updated[/bold cyan] [bold]conda.lock[/bold]")
     else:
         resolved_all = resolve_all_environments(config, ctx.platform)
         console.print(
-            "[bold blue]Updating[/bold blue]"
-            " [bold]conda.lock[/bold][dim]...[/dim]"
+            "[bold blue]Updating[/bold blue] [bold]conda.lock[/bold][dim]...[/dim]"
         )
         generate_lockfile(ctx, resolved_all)
-        console.print(
-            "[bold cyan]Updated[/bold cyan]"
-            " [bold]conda.lock[/bold]"
-        )
+        console.print("[bold cyan]Updated[/bold cyan] [bold]conda.lock[/bold]")
 
     return 0

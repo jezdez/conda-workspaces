@@ -66,7 +66,8 @@ def test_run_strips_double_dash(pixi_workspace, monkeypatch, tmp_workspace_env):
         return 0
 
     monkeypatch.setattr(
-        "conda.cli.main_run.execute", fake_conda_run,
+        "conda.cli.main_run.execute",
+        fake_conda_run,
     )
 
     args = argparse.Namespace(
@@ -90,7 +91,8 @@ def test_run_returns_nonzero_on_failure(pixi_workspace, monkeypatch, tmp_workspa
         return 42
 
     monkeypatch.setattr(
-        "conda.cli.main_run.execute", fake_conda_run,
+        "conda.cli.main_run.execute",
+        fake_conda_run,
     )
 
     args = argparse.Namespace(
