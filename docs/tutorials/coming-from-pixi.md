@@ -17,7 +17,7 @@ how the two tools relate and how to use them side by side.
 | Template engine | MiniJinja (Rust) | Jinja2 (Python) |
 | Shell | `deno_task_shell` | Native platform shell |
 | Package builds | pixi-build (rattler-build) | conda-build (separate) |
-| CLI | `pixi` | `cw` / `ct` / `conda workspace` / `conda task` |
+| CLI | `pixi` | `conda workspace` / `conda task` |
 
 ## Using both tools
 
@@ -30,7 +30,7 @@ pixi install
 pixi run test
 
 # conda users
-cw install
+conda workspace install
 conda task run test
 ```
 
@@ -41,25 +41,25 @@ task definitions alike.
 
 | pixi | conda-workspaces |
 |---|---|
-| `pixi init` | `cw init` |
-| `pixi install` | `cw install` |
-| `pixi install --locked` | `cw install --locked` (validates lockfile freshness) |
-| `pixi install --frozen` | `cw install --frozen` (installs from lockfile as-is) |
-| `pixi add python` | `cw add python` |
-| `pixi add --feature test pytest` | `cw add -e test pytest` or `cw add --feature test pytest` |
-| `pixi add --pypi requests` | `cw add --pypi requests` |
-| `pixi remove numpy` | `cw remove numpy` |
-| `pixi run <task>` | `conda task run <task>` or `ct run <task>` |
-| `pixi run CMD` | `cw run -- CMD` or `cw shell -- CMD` |
-| `pixi list` | `cw list` (packages in default env) |
-| `pixi list` (envs) | `cw envs` |
-| `pixi list` (specific env) | `cw list -e <env>` |
-| `pixi info` | `cw info` (workspace overview) |
-| `pixi info` (per-env) | `cw info -e <env>` |
-| `pixi lock` | `cw lock` (pure solve, no install required) |
-| `pixi shell` | `cw shell` or `cw shell -e <env>` |
-| `pixi clean` | `cw clean` |
-| `pixi task list` | `conda task list` or `ct list` |
+| `pixi init` | `conda workspace init` |
+| `pixi install` | `conda workspace install` |
+| `pixi install --locked` | `conda workspace install --locked` (validates lockfile freshness) |
+| `pixi install --frozen` | `conda workspace install --frozen` (installs from lockfile as-is) |
+| `pixi add python` | `conda workspace add python` |
+| `pixi add --feature test pytest` | `conda workspace add -e test pytest` or `conda workspace add --feature test pytest` |
+| `pixi add --pypi requests` | `conda workspace add --pypi requests` |
+| `pixi remove numpy` | `conda workspace remove numpy` |
+| `pixi run <task>` | `conda task run <task>` |
+| `pixi run CMD` | `conda workspace run -- CMD` or `conda workspace shell -- CMD` |
+| `pixi list` | `conda workspace list` (packages in default env) |
+| `pixi list` (envs) | `conda workspace envs` |
+| `pixi list` (specific env) | `conda workspace list -e <env>` |
+| `pixi info` | `conda workspace info` (workspace overview) |
+| `pixi info` (per-env) | `conda workspace info -e <env>` |
+| `pixi lock` | `conda workspace lock` (pure solve, no install required) |
+| `pixi shell` | `conda workspace shell` or `conda workspace shell -e <env>` |
+| `pixi clean` | `conda workspace clean` |
+| `pixi task list` | `conda task list` |
 
 ## Template compatibility
 
@@ -101,7 +101,7 @@ If your team uses only conda, you can use `conda.toml` instead of
 `pixi.toml`. The format is structurally identical:
 
 ```bash
-cw init --format conda
+conda workspace init --format conda
 ```
 
 This creates a `conda.toml` file with the same workspace/feature/

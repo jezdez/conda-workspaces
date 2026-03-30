@@ -125,18 +125,23 @@ test = { features = ["test"] }
 
 ::::
 
+:::{tip}
+`cw` and `ct` are available as shorter aliases for `conda workspace`
+and `conda task`.
+:::
+
 Or use the init command to scaffold one:
 
 ```bash
-cw init
-# or: cw init --format conda
-# or: cw init --format pyproject
+conda workspace init
+# or: conda workspace init --format conda
+# or: conda workspace init --format pyproject
 ```
 
 ## Install environments
 
 ```bash
-cw install
+conda workspace install
 ```
 
 This creates project-local conda environments under `.conda/envs/` for
@@ -146,24 +151,24 @@ generated automatically after solving.
 You can point to a specific manifest with `--file` / `-f`:
 
 ```bash
-cw install -f path/to/conda.toml
+conda workspace install -f path/to/conda.toml
 ```
 
 To recreate environments from scratch, use `--force-reinstall`:
 
 ```bash
-cw install --force-reinstall
+conda workspace install --force-reinstall
 ```
 
 ## Lock
 
 ![lockfile demo](../demos/lockfile.gif)
 
-The `cw lock` command runs the solver and records the solution in
+The `conda workspace lock` command runs the solver and records the solution in
 `conda.lock` without installing any environments:
 
 ```bash
-cw lock
+conda workspace lock
 ```
 
 ## Reproducible installs
@@ -173,14 +178,14 @@ lockfile is still fresh relative to the manifest — if the manifest has
 changed, the install fails:
 
 ```bash
-cw install --locked
+conda workspace install --locked
 ```
 
 Use `--frozen` to install from the lockfile as-is, without checking
 freshness:
 
 ```bash
-cw install --frozen
+conda workspace install --frozen
 ```
 
 ## Run in workspace environments
@@ -194,46 +199,46 @@ conda task run -e test pytest -v
 Run a one-shot command in an environment:
 
 ```bash
-cw run -e test -- python -c "import numpy; print(numpy.__version__)"
+conda workspace run -e test -- python -c "import numpy; print(numpy.__version__)"
 ```
 
 Or spawn an interactive shell:
 
 ```bash
-cw shell -e test
+conda workspace shell -e test
 ```
 
 ## Add dependencies
 
 ```bash
-cw add numpy
+conda workspace add numpy
 ```
 
 Add to a specific feature:
 
 ```bash
-cw add --feature test pytest
+conda workspace add --feature test pytest
 ```
 
 Add a PyPI dependency:
 
 ```bash
-cw add --pypi requests
+conda workspace add --pypi requests
 ```
 
 ## List packages and environments
 
 ```bash
-cw list              # packages in default env
-cw list -e test      # packages in test env
-cw envs              # list defined environments
+conda workspace list              # packages in default env
+conda workspace list -e test      # packages in test env
+conda workspace envs              # list defined environments
 ```
 
 ## Workspace overview
 
 ```bash
-cw info
-cw info -e test      # details for a specific environment
+conda workspace info
+conda workspace info -e test      # details for a specific environment
 ```
 
 ## Next steps

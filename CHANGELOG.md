@@ -21,7 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 - Initial implementation of conda-workspaces plugin
 - `conda workspace` subcommand with `init`, `install`, `list`, `info`,
   `add`, `remove`, `clean`, `run`, and `activate` subcommands
-- `cw` standalone CLI shortcut
+- `conda workspace` standalone CLI (also available as `cw`)
 - Parser support for `pixi.toml`, `conda.toml`, and `pyproject.toml`
   manifests
 - Multi-environment workspace model with composable features

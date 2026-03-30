@@ -33,7 +33,7 @@ jobs:
         run: conda install -c conda-forge conda-workspaces
 
       - name: Install test environment
-        run: cw install -e test
+        run: conda workspace install -e test
 
       - name: Run tests
         run: conda task run -e test check
@@ -52,7 +52,7 @@ Speed up CI by caching the `.conda/envs/` directory:
             conda-envs-${{ runner.os }}-
 
       - name: Install test environment
-        run: cw install -e test
+        run: conda workspace install -e test
 ```
 
 ## Multiple environments
@@ -69,7 +69,7 @@ jobs:
         with:
           miniforge-version: latest
       - run: conda install -c conda-forge conda-workspaces
-      - run: cw install -e test
+      - run: conda workspace install -e test
       - run: conda task run -e test check
 
   docs:
@@ -80,7 +80,7 @@ jobs:
         with:
           miniforge-version: latest
       - run: conda install -c conda-forge conda-workspaces
-      - run: cw install -e docs
+      - run: conda workspace install -e docs
       - run: conda task run -e docs build-docs
 ```
 

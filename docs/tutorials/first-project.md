@@ -15,7 +15,7 @@ Start by creating a `conda.toml` in your project root:
 
 ```bash
 mkdir my-project && cd my-project
-cw init --format conda --name my-project
+conda workspace init --format conda --name my-project
 ```
 
 This creates a `conda.toml` with sensible defaults:
@@ -34,20 +34,20 @@ platforms = ["linux-64", "osx-arm64"]
 Add your base dependencies:
 
 ```bash
-cw add "python>=3.10"
-cw add "numpy>=1.24" "scipy>=1.11"
+conda workspace add "python>=3.10"
+conda workspace add "numpy>=1.24" "scipy>=1.11"
 ```
 
 Add test dependencies to a test feature:
 
 ```bash
-cw add -e test "pytest>=8.0" "pytest-cov>=4.0"
+conda workspace add -e test "pytest>=8.0" "pytest-cov>=4.0"
 ```
 
 Add documentation dependencies:
 
 ```bash
-cw add -e docs "sphinx>=7.0" "myst-parser>=3.0"
+conda workspace add -e docs "sphinx>=7.0" "myst-parser>=3.0"
 ```
 
 Your `conda.toml` now looks like:
@@ -80,7 +80,7 @@ docs = { features = ["docs"] }
 ## Install environments
 
 ```bash
-cw install
+conda workspace install
 ```
 
 This creates three conda environments under `.conda/envs/`:
@@ -138,20 +138,20 @@ conda task run -e docs build-docs
 Run a one-shot command in a workspace environment:
 
 ```bash
-cw run -e test -- python -c "import numpy; print(numpy.__version__)"
+conda workspace run -e test -- python -c "import numpy; print(numpy.__version__)"
 ```
 
 Or drop into an interactive shell:
 
 ```bash
-cw shell -e test
+conda workspace shell -e test
 ```
 
 ## Check environment status
 
 ```bash
-cw envs
-cw info -e test
+conda workspace envs
+conda workspace info -e test
 ```
 
 ## Next steps

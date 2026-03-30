@@ -57,13 +57,13 @@ test = { features = ["test"] }
 Then install and use your environments:
 
 ```bash
-cw install                    # solve + install + generate conda.lock
-cw run -e test -- pytest -v   # run a command in an environment
-cw shell -e test              # spawn a shell with test env activated
-cw install --locked           # reproducible install from conda.lock
-cw list                       # list packages in default env
-cw envs                       # list defined environments
-cw info                       # workspace overview
+conda workspace install                    # solve + install + generate conda.lock
+conda workspace run -e test -- pytest -v   # run a command in an environment
+conda workspace shell -e test              # spawn a shell with test env activated
+conda workspace install --locked           # reproducible install from conda.lock
+conda workspace list                       # list packages in default env
+conda workspace envs                       # list defined environments
+conda workspace info                       # workspace overview
 ```
 
 ## Define tasks
@@ -112,7 +112,7 @@ This means:
 - Task dependencies, caching, Jinja2 templates, and platform overrides
   all work out of the box
 - Ships as a conda plugin (`conda workspace`, `conda task`) and
-  standalone `cw` / `ct` CLIs
+  standalone `conda workspace` / `conda task` CLIs (also available as `cw` / `ct`)
 
 Read more in [](motivation.md).
 

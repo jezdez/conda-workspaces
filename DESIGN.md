@@ -11,11 +11,11 @@ multi-environment workspace management to conda.  It reads pixi-compatible
 manifest files (`pixi.toml`, `conda.toml`, `pyproject.toml`) and manages
 project-local conda environments under `.conda/envs/`.
 
-The plugin registers two subcommands: `conda workspace` (with `cw` as a
-standalone shortcut) for environment management (`init`, `install`,
-`lock`, `list`, `envs`, `info`, `add`, `remove`, `clean`, `run`,
-`shell`, `activate`) and `conda task` (with `ct` as a shortcut) for
-task execution (`run`, `list`, `add`, `remove`, `export`).
+The plugin registers two subcommands: `conda workspace` for environment
+management (`init`, `install`, `lock`, `list`, `envs`, `info`, `add`,
+`remove`, `clean`, `run`, `shell`, `activate`) and `conda task` for
+task execution (`run`, `list`, `add`, `remove`, `export`).  Standalone
+shortcuts `cw` and `ct` are also available as aliases.
 
 ## Goals
 
@@ -120,10 +120,11 @@ supported.  This is structurally identical to pixi.toml but:
   settings, conda-build integration)
 - Provides a non-pixi-branded option for teams that only use conda
 
-### 5. Standalone CLI Shortcut (`cw`)
+### 5. Standalone CLI Aliases (`cw` / `ct`)
 
-The `cw` console script provides a standalone entry point that doesn't
-require going through `conda workspace ...`.  This is registered via
+The primary CLI forms are `conda workspace` and `conda task`.  For
+convenience, `cw` and `ct` console scripts provide standalone aliases
+that don't require the `conda` prefix.  These are registered via
 `[project.scripts]` in pyproject.toml:
 
 ```toml
@@ -131,7 +132,7 @@ require going through `conda workspace ...`.  This is registered via
 cw = "conda_workspaces.__main__:main"
 ```
 
-Similarly, `ct` provides a shortcut for `conda task`.
+`ct` is the equivalent alias for `conda task`.
 
 ### 6. Task System Architecture
 
@@ -178,8 +179,8 @@ overrides or Jinja2 conditionals.
 3. **Lock files** — conda-workspaces generates a `conda.lock` in
    rattler-lock v6 format (the same structure as `pixi.lock`) after
    every install.  The `--locked` flag installs from the lockfile
-   without running the solver, and `cw lock` regenerates the lockfile
-   on demand.
+   without running the solver, and `conda workspace lock` regenerates
+   the lockfile on demand.
 
 4. **Plugin, not standalone** — conda-workspaces is a conda plugin;
    pixi is a standalone tool that replaces conda entirely for its users.

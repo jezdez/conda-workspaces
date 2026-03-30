@@ -329,7 +329,7 @@ env = { DEBUG = "1" }
 ```
 
 Activation settings are merged across features when composing an
-environment. After `cw install`, environment variables are written to
+environment. After `conda workspace install`, environment variables are written to
 the prefix state file (available via `conda activate`) and activation
 scripts are copied to `$PREFIX/etc/conda/activate.d/`.
 
@@ -365,19 +365,19 @@ conda's default channel priority applies.
 ## Lock
 
 conda-workspaces generates a `conda.lock` file in YAML format based on
-the rattler-lock v6 specification. The `cw lock` command runs the solver
+the rattler-lock v6 specification. The `conda workspace lock` command runs the solver
 and records the solution — it does not require environments to be
 installed first.
 
 ```bash
 # Generate or update the lockfile
-cw lock
+conda workspace lock
 
 # Install from lockfile, validating freshness against the manifest
-cw install --locked
+conda workspace install --locked
 
 # Install from lockfile as-is without checking freshness
-cw install --frozen
+conda workspace install --frozen
 ```
 
 The lockfile contains all environments and their resolved packages:
@@ -415,7 +415,7 @@ checks entirely and install the lockfile as-is.
 You can also point to a specific manifest with `--file` / `-f`:
 
 ```bash
-cw install -f path/to/conda.toml
+conda workspace install -f path/to/conda.toml
 ```
 
 ## Project-local environments
@@ -435,6 +435,6 @@ my-project/
 └── src/
 ```
 
-Environments are standard conda prefixes. Use `cw run -e <name> -- CMD`
-to run a command in an environment, `cw shell -e <name>` for an
+Environments are standard conda prefixes. Use `conda workspace run -e <name> -- CMD`
+to run a command in an environment, `conda workspace shell -e <name>` for an
 interactive shell, or `conda activate .conda/envs/<name>` directly.

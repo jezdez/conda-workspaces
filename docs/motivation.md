@@ -31,10 +31,10 @@ definitions, and installation. Running `pixi install` uses rattler
 | Define tasks | `pixi.toml` `[tasks]` | Same manifest file |
 | Solve dependencies | rattler (bundled) | conda / libmamba (existing) |
 | Install packages | rattler (into `.pixi/envs/`) | conda (into `.conda/envs/`) |
-| Manage environments | `pixi install` | `cw install` (delegates to conda) |
+| Manage environments | `pixi install` | `conda workspace install` (delegates to conda) |
 | Run tasks | `pixi run <task>` | `conda task run <task>` |
-| Run commands in env | `pixi run CMD` | `cw run -- CMD` or `cw shell -e ENV -- CMD` |
-| Activate | `pixi shell` | `cw shell` / `conda activate .conda/envs/<name>` |
+| Run commands in env | `pixi run CMD` | `conda workspace run -- CMD` or `conda workspace shell -e ENV -- CMD` |
+| Activate | `pixi shell` | `conda workspace shell` / `conda activate .conda/envs/<name>` |
 
 This approach has advantages:
 
@@ -68,7 +68,7 @@ conda-workspaces reads the same manifest format as pixi. A project with a
 `pixi.toml` can use both tools:
 
 - pixi users run `pixi install` and `pixi run` as usual
-- conda users run `cw install` and `conda task run` using conda's solver
+- conda users run `conda workspace install` and `conda task run` using conda's solver
 
 This coexistence is possible because each tool stores environments in a
 different directory (`.pixi/envs/` vs `.conda/envs/`), so they don't

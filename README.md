@@ -45,11 +45,11 @@ depends-on = ["test", "lint"]
 Install and manage your environments, then run tasks:
 
 ```console
-$ cw install              # solve + install + generate conda.lock
-$ cw envs                 # list defined environments
-$ conda task run check    # runs lint and test in dependency order
-$ cw shell -e test        # spawn a shell with test env activated
-$ cw install --locked     # reproducible install from conda.lock
+$ conda workspace install              # solve + install + generate conda.lock
+$ conda workspace envs                 # list defined environments
+$ conda task run check                 # runs lint and test in dependency order
+$ conda workspace shell -e test        # spawn a shell with test env activated
+$ conda workspace install --locked     # reproducible install from conda.lock
 ```
 
 ## Why?
@@ -76,7 +76,7 @@ and task running inside the conda CLI without switching tools.
 - Task dependencies with topological ordering (`depends-on`)
 - Jinja2 templates in commands (`{{ conda.platform }}`, conditionals)
 - Task arguments with defaults, input/output caching, and per-platform overrides
-- Standalone `cw` / `ct` CLIs and `conda workspace` / `conda task` plugin subcommands
+- `conda workspace` / `conda task` subcommands (also available as `cw` / `ct` aliases)
 
 ## Installation
 
@@ -86,25 +86,25 @@ conda install -c conda-forge conda-workspaces
 
 ## CLI
 
-conda-workspaces registers as `conda workspace` and `conda task`, and
-provides `cw` and `ct` as standalone shortcuts.
+conda-workspaces registers `conda workspace` and `conda task` subcommands,
+and also provides `cw` and `ct` as shorter aliases.
 
 ### Workspace commands
 
 | Command | Description |
 |---|---|
-| `cw init` | Initialize a new workspace manifest |
-| `cw install` | Create/update workspace environments |
-| `cw install --locked` | Install from lockfile (skip solving) |
-| `cw lock` | Generate/update `conda.lock` |
-| `cw list` | List packages in an environment |
-| `cw envs` | List defined environments |
-| `cw info [ENV]` | Show environment details |
-| `cw add SPECS...` | Add dependencies |
-| `cw remove SPECS...` | Remove dependencies |
-| `cw shell [ENV]` | Spawn a shell with an environment activated |
-| `cw activate [ENV]` | Print activation instructions |
-| `cw clean` | Remove installed environments |
+| `conda workspace init` | Initialize a new workspace manifest |
+| `conda workspace install` | Create/update workspace environments |
+| `conda workspace install --locked` | Install from lockfile (skip solving) |
+| `conda workspace lock` | Generate/update `conda.lock` |
+| `conda workspace list` | List packages in an environment |
+| `conda workspace envs` | List defined environments |
+| `conda workspace info [ENV]` | Show environment details |
+| `conda workspace add SPECS...` | Add dependencies |
+| `conda workspace remove SPECS...` | Remove dependencies |
+| `conda workspace shell [ENV]` | Spawn a shell with an environment activated |
+| `conda workspace activate [ENV]` | Print activation instructions |
+| `conda workspace clean` | Remove installed environments |
 
 ### Task commands
 
@@ -115,8 +115,6 @@ provides `cw` and `ct` as standalone shortcuts.
 | `conda task add NAME CMD` | Add a task to the manifest |
 | `conda task remove NAME` | Remove a task from the manifest |
 | `conda task export` | Export tasks to `conda.toml` format |
-
-The `ct` shortcut works like `conda task`: `ct run check`, `ct list`, etc.
 
 ## What it doesn't do
 
