@@ -297,6 +297,27 @@ The environment specifiers also surface PyPI dependencies as
 `external_packages` (under the `"pip"` key) so that conda's own
 reporting and downstream tools can see them.
 
+### 7. Hardlink Optimization
+
+Project-local environments live under `.conda/envs/`, which may be on
+a different filesystem from conda's global package cache (`pkgs_dirs`).
+When they are, conda silently falls back from hardlinks to copies,
+significantly increasing disk usage — especially in CI and Docker
+where the global cache is often on a separate volume.
+
+conda already provides the `CONDA_PKGS_DIRS` environment variable to
+redirect the package cache.  In CI/Docker, set it to a path on the
+same filesystem as the project directory to ensure hardlinks work:
+
+```bash
+export CONDA_PKGS_DIRS="$PWD/.conda/pkgs"
+conda workspace install
+```
+
+conda-workspaces does not manage this setting itself — it defers to
+conda's existing mechanism, which works regardless of whether
+conda-workspaces is installed.
+
 ## Future Work
 
 - **conda-build integration**: Build packages from workspace members
@@ -304,8 +325,6 @@ reporting and downstream tools can see them.
 - **Multi-package workspaces**: Support monorepo layouts where
   subdirectories are independent packages that can depend on each other
   (pixi's `[package]` concept, reimagined for conda-build).
-- **Hardlink optimization**: Use hardlinks from the package cache to
-  reduce disk usage for project-local environments.
 - **Multi-platform lockfiles**: Record packages for all declared
   platforms in `conda.lock`, not only the current host platform.
   Requires cross-platform solving or collecting data from CI runners
