@@ -57,7 +57,10 @@ class WorkspaceParseError(CondaWorkspacesError):
     def __init__(self, path: str | Path, reason: str) -> None:
         self.path = path
         self.reason = reason
-        super().__init__(f"Failed to parse workspace manifest '{path}': {reason}")
+        super().__init__(
+            f"Failed to parse workspace manifest '{path}': {reason}",
+            hints=["Check the file syntax and try again."],
+        )
 
 
 class EnvironmentNotFoundError(CondaWorkspacesError):
@@ -107,7 +110,10 @@ class FeatureNotFoundError(CondaWorkspacesError):
         self.environment = environment
         super().__init__(
             f"Feature '{feature}' referenced by environment '{environment}'"
-            " is not defined in the workspace."
+            " is not defined in the workspace.",
+            hints=[
+                f"Add [feature.{feature}.dependencies] to your manifest.",
+            ],
         )
 
 
@@ -131,7 +137,10 @@ class SolveError(CondaWorkspacesError):
     def __init__(self, environment: str, reason: str) -> None:
         self.environment = environment
         self.reason = reason
-        super().__init__(f"Failed to solve environment '{environment}': {reason}")
+        super().__init__(
+            f"Failed to solve environment '{environment}': {reason}",
+            hints=["Check your dependency specifications and channel configuration."],
+        )
 
 
 class ActivationError(CondaWorkspacesError):
@@ -140,7 +149,13 @@ class ActivationError(CondaWorkspacesError):
     def __init__(self, environment: str, reason: str) -> None:
         self.environment = environment
         self.reason = reason
-        super().__init__(f"Failed to activate environment '{environment}': {reason}")
+        super().__init__(
+            f"Failed to activate environment '{environment}': {reason}",
+            hints=[
+                f"Ensure the environment is installed:"
+                f" conda workspace install -e {environment}",
+            ],
+        )
 
 
 class LockfileNotFoundError(CondaWorkspacesError):
@@ -175,7 +190,7 @@ class LockfileStaleError(CondaWorkspacesError):
 class TaskNotFoundError(CondaWorkspacesError):
     """Raised when a referenced task does not exist."""
 
-    def __init__(self, task_name: str, available: list[str] | None = None):
+    def __init__(self, task_name: str, available: list[str] | None = None) -> None:
         hints = []
         if available:
             hints.append(
@@ -187,29 +202,37 @@ class TaskNotFoundError(CondaWorkspacesError):
 class CyclicDependencyError(CondaWorkspacesError):
     """Raised when the task dependency graph contains a cycle."""
 
-    def __init__(self, cycle: list[str]):
+    def __init__(self, cycle: list[str]) -> None:
         path = " -> ".join(cycle)
-        super().__init__(f"Cyclic dependency detected: {path}")
+        super().__init__(
+            f"Cyclic dependency detected: {path}",
+            hints=["Remove or restructure the circular depends-on references."],
+        )
 
 
 class TaskParseError(CondaWorkspacesError):
     """Raised when a task definition file cannot be parsed."""
 
-    def __init__(self, path: str, reason: str):
-        super().__init__(f"Failed to parse '{path}': {reason}")
+    def __init__(self, path: str | Path, reason: str) -> None:
+        super().__init__(
+            f"Failed to parse '{path}': {reason}",
+            hints=["Check the file syntax and try again."],
+        )
 
 
 class TaskExecutionError(CondaWorkspacesError):
     """Raised when a task command exits with a non-zero status."""
 
-    def __init__(self, task_name: str, exit_code: int):
-        super().__init__(f"Task '{task_name}' failed with exit code {exit_code}")
+    def __init__(self, task_name: str, exit_code: int) -> None:
+        super().__init__(
+            f"Task '{task_name}' failed with exit code {exit_code}.",
+        )
 
 
 class NoTaskFileError(CondaWorkspacesError):
     """Raised when no task definition file is found."""
 
-    def __init__(self, search_dir: str):
+    def __init__(self, search_dir: str) -> None:
         super().__init__(
             f"No task file found in '{search_dir}'.",
             hints=[
