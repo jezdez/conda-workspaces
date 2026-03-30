@@ -7,9 +7,8 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 
 from ...exceptions import EnvironmentNotFoundError
-from ...lockfile import generate_lockfile, lockfile_path
+from ...lockfile import generate_lockfile
 from ...resolver import resolve_all_environments, resolve_environment
-from .. import status
 from . import workspace_context_from_args
 
 if TYPE_CHECKING:
@@ -26,21 +25,29 @@ def execute_lock(args: argparse.Namespace, *, console: Console | None = None) ->
 
     if env_name:
         if env_name not in config.environments:
-            raise EnvironmentNotFoundError(env_name, list(config.environments.keys()))
+            raise EnvironmentNotFoundError(
+                env_name, list(config.environments.keys()),
+            )
         resolved = resolve_environment(config, env_name, ctx.platform)
-        path = generate_lockfile(ctx, {env_name: resolved})
-        status.done(console, env_name, detail=str(path))
+        console.print(
+            "[bold blue]Updating[/bold blue]"
+            " [bold]conda.lock[/bold][dim]...[/dim]"
+        )
+        generate_lockfile(ctx, {env_name: resolved})
+        console.print(
+            "[bold cyan]Updated[/bold cyan]"
+            " [bold]conda.lock[/bold]"
+        )
     else:
         resolved_all = resolve_all_environments(config, ctx.platform)
-        path = generate_lockfile(ctx, resolved_all)
-        for name in resolved_all:
-            status.done(console, name)
-        n = len(resolved_all)
         console.print(
-            f"{n}"
-            f" {'environment' if n == 1 else 'environments'}"
-            f" locked in"
-            f" [dim]{lockfile_path(ctx)}[/dim]."
+            "[bold blue]Updating[/bold blue]"
+            " [bold]conda.lock[/bold][dim]...[/dim]"
+        )
+        generate_lockfile(ctx, resolved_all)
+        console.print(
+            "[bold cyan]Updated[/bold cyan]"
+            " [bold]conda.lock[/bold]"
         )
 
     return 0

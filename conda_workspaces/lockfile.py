@@ -154,17 +154,32 @@ def generate_lockfile(
 
     Solves each environment in *resolved_envs* and writes the results
     to a single ``conda.lock`` YAML file at the workspace root.
+    Conda's solver output is suppressed during this re-solve since
+    the user already saw it during the install step.
 
     Returns the path to the generated lockfile.
     """
+    import os
+    import sys
+
+    from conda.base.context import context as conda_context
+
     platform = ctx.platform
     environments: dict[tuple[str, str], list] = {}
     channels_by_env: dict[str, list[str]] = {}
 
-    for name, resolved in resolved_envs.items():
-        records = _solve_for_records(ctx, resolved)
-        environments[(name, platform)] = records
-        channels_by_env[name] = [str(ch) for ch in resolved.channels]
+    with conda_context._override("quiet", True):
+        real_stdout = sys.stdout
+        devnull = open(os.devnull, "w")
+        try:
+            sys.stdout = devnull
+            for name, resolved in resolved_envs.items():
+                records = _solve_for_records(ctx, resolved)
+                environments[(name, platform)] = records
+                channels_by_env[name] = [str(ch) for ch in resolved.channels]
+        finally:
+            sys.stdout = real_stdout
+            devnull.close()
 
     data = _build_lockfile_dict(environments, channels_by_env)
 
@@ -249,8 +264,11 @@ def install_from_lockfile(ctx: WorkspaceContext, env_name: str) -> None:
     prefix = ctx.env_prefix(env_name)
     prefix.mkdir(parents=True, exist_ok=True)
 
+    import sys
+
     records = get_package_records_from_explicit(urls)
     install_explicit_packages(
         package_cache_records=list(records),
         prefix=str(prefix),
     )
+    sys.stdout.flush()

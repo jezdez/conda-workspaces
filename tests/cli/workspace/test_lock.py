@@ -23,8 +23,8 @@ _DEFAULTS = {
 @pytest.mark.parametrize(
     "env_arg, expected_keys, output_fragment",
     [
-        ("default", {"default"}, "✓"),
-        (None, {"default", "test"}, "2 environments"),
+        ("default", {"default"}, "Updated"),
+        (None, {"default", "test"}, "Updated"),
     ],
     ids=["single-env", "all-envs"],
 )
