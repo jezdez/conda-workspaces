@@ -133,18 +133,18 @@ Build documentation:
 conda task run -e docs build-docs
 ```
 
-## Spawn a shell
+## Run commands in an environment
 
-To drop into an interactive shell with an environment activated:
+Run a one-shot command in a workspace environment:
+
+```bash
+cw run -e test -- python -c "import numpy; print(numpy.__version__)"
+```
+
+Or drop into an interactive shell:
 
 ```bash
 cw shell -e test
-```
-
-Or run a one-shot command:
-
-```bash
-cw shell -e test -- python -c "import numpy; print(numpy.__version__)"
 ```
 
 ## Check environment status

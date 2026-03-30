@@ -435,4 +435,6 @@ my-project/
 └── src/
 ```
 
-Environments are standard conda prefixes and work with `conda activate`.
+Environments are standard conda prefixes. Use `cw run -e <name> -- CMD`
+to run a command in an environment, `cw shell -e <name>` for an
+interactive shell, or `conda activate .conda/envs/<name>` directly.

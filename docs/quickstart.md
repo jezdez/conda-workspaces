@@ -183,7 +183,7 @@ freshness:
 cw install --frozen
 ```
 
-## Run tasks in workspace environments
+## Run in workspace environments
 
 Once your workspace is installed, run tasks in specific environments:
 
@@ -191,16 +191,16 @@ Once your workspace is installed, run tasks in specific environments:
 conda task run -e test pytest -v
 ```
 
+Run a one-shot command in an environment:
+
+```bash
+cw run -e test -- python -c "import numpy; print(numpy.__version__)"
+```
+
 Or spawn an interactive shell:
 
 ```bash
 cw shell -e test
-```
-
-You can also pass a one-shot command to `cw shell`:
-
-```bash
-cw shell -e test -- python -c "import numpy; print(numpy.__version__)"
 ```
 
 ## Add dependencies
