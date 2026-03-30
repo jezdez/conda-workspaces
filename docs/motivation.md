@@ -85,7 +85,6 @@ for the full compatibility mapping.
 | pixi | Full project mgmt | Yes | Yes | Yes | rattler (bundled) |
 | conda-project | Project management | Commands only | Yes | Yes | conda (via conda-lock) |
 | anaconda-project | Project management | Commands only | Yes | Yes | conda |
-| conda-tasks (legacy) | Task runner | Yes | No | No | N/A |
 | conda-devenv | Env templating | No | Via includes | Yes | conda / mamba |
 | conda-lock | Lock files only | No | N/A | Yes | conda |
 | tox / nox | Test matrix | Yes | Virtualenvs | No | pip |
@@ -123,8 +122,8 @@ conda-workspaces differs from all of the above in two ways:
 
 ### Task runner prior art
 
-On the task-running side, conda-workspaces replaces what was previously
-the separate `conda-tasks` plugin and draws from a broader set of tools.
+The task runner in conda-workspaces draws from a broad set of prior
+work.
 
 [pixi](https://pixi.sh) was the first tool to ship a full-featured task
 runner tightly integrated with conda package management: task

@@ -11,9 +11,11 @@ multi-environment workspace management to conda.  It reads pixi-compatible
 manifest files (`pixi.toml`, `conda.toml`, `pyproject.toml`) and manages
 project-local conda environments under `.conda/envs/`.
 
-The plugin registers a `conda workspace` subcommand (with `cw` as a
-standalone shortcut) that provides `init`, `install`, `lock`, `list`,
-`info`, `add`, `remove`, `clean`, `run`, `shell`, and `activate` subcommands.
+The plugin registers two subcommands: `conda workspace` (with `cw` as a
+standalone shortcut) for environment management (`init`, `install`,
+`lock`, `list`, `envs`, `info`, `add`, `remove`, `clean`, `run`,
+`shell`, `activate`) and `conda task` (with `ct` as a shortcut) for
+task execution (`run`, `list`, `add`, `remove`, `export`).
 
 ## Goals
 
@@ -65,7 +67,7 @@ standalone shortcut) that provides `init`, `install`, `lock`, `list`,
 |---|---|
 | `[package]` / pixi-build | Pixi's build system uses rattler-build with custom backends. conda uses conda-build or rattler-build directly. These are fundamentally different build orchestration systems. |
 | `[host-dependencies]` / `[build-dependencies]` | Part of the `[package]` build model. Not applicable outside pixi-build. |
-| `deno_task_shell` | Pixi tasks use a Deno-compatible shell. conda-tasks handles task execution separately; no overlap with workspace management. |
+| `deno_task_shell` | Pixi tasks use a Deno-compatible shell for cross-platform execution. conda-workspaces uses the native platform shell (`sh` on Unix, `cmd` on Windows) and provides platform overrides and Jinja2 conditionals for cross-platform support. |
 | `tool.pixi.project.conda-pypi-map` | Pixi's custom mapping for conda↔PyPI name translation. conda-pypi handles this differently. |
 
 ## Key Design Decisions
@@ -129,7 +131,37 @@ require going through `conda workspace ...`.  This is registered via
 cw = "conda_workspaces.__main__:main"
 ```
 
-Similarly, conda-tasks provides `ct` as a shortcut for `conda task`.
+Similarly, `ct` provides a shortcut for `conda task`.
+
+### 6. Task System Architecture
+
+The task runner is built into conda-workspaces. Tasks are parsed from
+the same manifest files as
+workspace definitions and share the parser infrastructure.
+
+**Execution pipeline**:
+
+1. **Parse** — manifest parsers produce `dict[str, Task]` via
+   `detect_and_parse_tasks()`. Platform overrides are resolved for the
+   current `context.subdir`.
+2. **Resolve** — `graph.resolve_execution_order()` builds a DAG from
+   `depends-on` declarations and returns a topologically sorted list.
+3. **Render** — `template.render()` expands Jinja2 variables
+   (`{{ conda.platform }}`, task args) in command strings and env vars.
+4. **Cache check** — when `inputs` and `outputs` are declared,
+   `cache.is_cached()` compares `(mtime, size, sha256)` fingerprints
+   against a `.conda/task-cache/` store. Cached tasks are skipped.
+5. **Execute** — `runner.SubprocessShell.run()` executes the rendered
+   command in the native platform shell, optionally inside an activated
+   conda environment via `conda.utils.wrap_subprocess_call`.
+6. **Cache save** — after successful execution, fingerprints are written
+   to the cache store.
+
+**Design rationale**: Tasks use the native platform shell rather than a
+cross-platform shell runtime. This trades pixi's `deno_task_shell`
+portability for zero additional dependencies and familiar shell
+behaviour. Platform-specific commands are handled via `[target.<platform>.tasks]`
+overrides or Jinja2 conditionals.
 
 ## Differences from Pixi
 

@@ -92,8 +92,8 @@ be preserved between runs for faster incremental builds:
 ```yaml
       - uses: actions/cache@v4
         with:
-          path: ~/.cache/conda-tasks
-          key: conda-tasks-${{ hashFiles('src/**/*.py') }}
+          path: ~/.cache/conda-workspaces
+          key: conda-workspaces-tasks-${{ hashFiles('src/**/*.py') }}
 ```
 
 ## Tasks without workspaces
