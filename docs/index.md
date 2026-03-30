@@ -102,7 +102,7 @@ existing infrastructure.
 
 This means:
 
-- Workspaces and tasks read from `pixi.toml`, `conda.toml`, or
+- Workspaces and tasks read from `conda.toml`, `pixi.toml`, or
   `pyproject.toml` — one manifest, multiple tools
 - Environments are solved by conda / libmamba and installed as regular
   conda prefixes

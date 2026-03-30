@@ -33,7 +33,7 @@ definitions, and installation. Running `pixi install` uses rattler
 | Install packages | rattler (into `.pixi/envs/`) | conda (into `.conda/envs/`) |
 | Manage environments | `pixi install` | `cw install` (delegates to conda) |
 | Run tasks | `pixi run <task>` | `conda task run <task>` |
-| Run commands in env | `pixi run CMD` | `cw shell -e ENV -- CMD` |
+| Run commands in env | `pixi run CMD` | `cw run -- CMD` or `cw shell -e ENV -- CMD` |
 | Activate | `pixi shell` | `cw shell` / `conda activate .conda/envs/<name>` |
 
 This approach has advantages:

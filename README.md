@@ -64,7 +64,7 @@ and task running inside the conda CLI without switching tools.
 
 ## What it does
 
-- Reads `pixi.toml`, `conda.toml`, and `pyproject.toml` workspace manifests
+- Reads `conda.toml`, `pixi.toml`, and `pyproject.toml` workspace manifests
 - Multi-environment support with composable features
 - Project-local environments in `.conda/envs/`
 - Lockfile generation (`conda.lock`) in rattler-lock v6 format for reproducible installs

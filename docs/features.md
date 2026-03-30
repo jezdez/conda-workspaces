@@ -87,11 +87,12 @@ Commands support Jinja2 templates with `conda.*` context variables:
 | Variable | Description |
 |---|---|
 | `{{ conda.platform }}` | Current platform (e.g. `osx-arm64`) |
+| `{{ conda.environment_name }}` | Name of the active conda environment |
 | `{{ conda.environment.name }}` | Active environment name |
-| `{{ conda.prefix }}` | `CONDA_PREFIX` path |
+| `{{ conda.prefix }}` | Target conda environment prefix path |
 | `{{ conda.version }}` | conda version |
 | `{{ conda.manifest_path }}` | Path to the task file |
-| `{{ conda.init_cwd }}` | CWD when `conda task` was invoked |
+| `{{ conda.init_cwd }}` | Current working directory at rendering time |
 | `{{ conda.is_win }}` | `True` on Windows |
 | `{{ conda.is_unix }}` | `True` on non-Windows |
 | `{{ conda.is_linux }}` | `True` on Linux |

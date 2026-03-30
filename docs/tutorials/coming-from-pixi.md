@@ -50,7 +50,7 @@ task definitions alike.
 | `pixi add --pypi requests` | `cw add --pypi requests` |
 | `pixi remove numpy` | `cw remove numpy` |
 | `pixi run <task>` | `conda task run <task>` or `ct run <task>` |
-| `pixi run CMD` | `cw shell -- CMD` (runs in project env) |
+| `pixi run CMD` | `cw run -- CMD` or `cw shell -- CMD` |
 | `pixi list` | `cw list` (packages in default env) |
 | `pixi list` (envs) | `cw envs` |
 | `pixi list` (specific env) | `cw list -e <env>` |

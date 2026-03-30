@@ -15,6 +15,13 @@ parents. The first matching file is used.
 2. `pixi.toml` — pixi-native format (reads `[tasks]` directly)
 3. `pyproject.toml` — reads `[tool.conda.tasks]` or `[tool.pixi.tasks]`
 
+When both `[tool.conda]` and `[tool.pixi]` exist in the same
+`pyproject.toml`, the entire `[tool.conda]` table takes precedence. This
+means that if `[tool.conda]` has any content (e.g. workspace settings)
+but no `[tool.conda.tasks]`, tasks from `[tool.pixi.tasks]` will not be
+loaded. To use pixi tasks, either remove `[tool.conda]` entirely or
+define your tasks under `[tool.conda.tasks]`.
+
 When a file defines both workspace and task sections, both are used.
 
 ## File formats
