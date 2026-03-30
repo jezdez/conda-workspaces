@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+pytest_plugins = ["conda.testing", "conda.testing.fixtures"]
+
+from contextlib import ExitStack
+from typing import TYPE_CHECKING, Protocol
 
 import pytest
 
@@ -11,11 +14,23 @@ from conda_workspaces.models import (
     Environment,
     Feature,
     MatchSpec,
+    Task,
+    TaskDependency,
+    TaskOverride,
     WorkspaceConfig,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
+
+    from conda.testing.fixtures import TmpEnvFixture
+
+
+class CreateWorkspaceEnv(Protocol):
+    """Callable signature for the tmp_workspace_env factory."""
+
+    def __call__(self, workspace: Path, name: str, *, pkg_count: int = 0) -> Path: ...
 
 
 @pytest.fixture
@@ -39,8 +54,8 @@ pytest = ">=8.0"
 sphinx = ">=7.0"
 
 [environments]
-default = {solve-group = "default"}
-test = {features = ["test"], solve-group = "default"}
+default = []
+test = {features = ["test"]}
 docs = {features = ["docs"]}
 """
     path = tmp_path / "pixi.toml"
@@ -68,7 +83,7 @@ pytest = ">=8.0"
 pytest-cov = ">=4.0"
 
 [tool.pixi.environments]
-test = {features = ["test"], solve-group = "default"}
+test = {features = ["test"]}
 """
     path = tmp_path / "pyproject.toml"
     path.write_text(content, encoding="utf-8")
@@ -109,10 +124,122 @@ def sample_config() -> WorkspaceConfig:
             "docs": docs_feat,
         },
         environments={
-            "default": Environment(name="default", solve_group="default"),
-            "test": Environment(name="test", features=["test"], solve_group="default"),
+            "default": Environment(name="default"),
+            "test": Environment(name="test", features=["test"]),
             "docs": Environment(name="docs", features=["docs"]),
         },
         root="/tmp/test-project",
         manifest_path="/tmp/test-project/pixi.toml",
+    )
+
+
+@pytest.fixture
+def tmp_workspace_env(tmp_env: TmpEnvFixture) -> Iterator[CreateWorkspaceEnv]:
+    """Factory fixture: creates a shallow conda environment inside a workspace.
+
+    Delegates to conda's ``tmp_env(shallow=True)`` to create the
+    environment at the workspace-relative ``.conda/envs/<name>/`` path.
+
+    Usage: ``prefix = tmp_workspace_env(workspace, "default", pkg_count=3)``
+    """
+    stack = ExitStack()
+
+    def _create(workspace: Path, name: str, *, pkg_count: int = 0) -> Path:
+        prefix = stack.enter_context(
+            tmp_env(shallow=True, prefix=workspace / ".conda" / "envs" / name)
+        )
+        for i in range(pkg_count):
+            (prefix / "conda-meta" / f"pkg-{i}.json").write_text("{}", encoding="utf-8")
+        return prefix
+
+    with stack:
+        yield _create
+
+
+@pytest.fixture
+def tmp_project(tmp_path: Path) -> Path:
+    """A temporary directory acting as a project root."""
+    return tmp_path
+
+
+@pytest.fixture
+def sample_yaml(tmp_project: Path) -> Path:
+    """Create a sample conda.toml for task testing (legacy fixture name)."""
+    content = """\
+[tasks]
+lint = "ruff check ."
+_setup = "mkdir -p build/"
+platform-task = "rm -rf build/"
+
+[tasks.build]
+cmd = "make build"
+depends-on = ["configure"]
+description = "Build the project"
+inputs = ["src/**/*.py"]
+outputs = ["dist/"]
+
+[tasks.configure]
+cmd = "cmake -G Ninja -S . -B .build"
+description = "Configure build system"
+
+[tasks.test]
+cmd = "pytest {{ test_path }}"
+env = { PYTHONPATH = "src" }
+clean-env = true
+args = [{ arg = "test_path", default = "tests/" }]
+
+[tasks.check]
+depends-on = ["test", "lint"]
+description = "Run all checks"
+
+[target.win-64.tasks]
+platform-task = "rd /s /q build"
+"""
+    path = tmp_project / "conda.toml"
+    path.write_text(content)
+    return path
+
+
+@pytest.fixture
+def simple_task() -> Task:
+    return Task(name="build", cmd="make build", description="Build it")
+
+
+@pytest.fixture
+def task_with_deps() -> dict[str, Task]:
+    return {
+        "configure": Task(name="configure", cmd="cmake ."),
+        "build": Task(
+            name="build",
+            cmd="make",
+            depends_on=[TaskDependency(task="configure")],
+        ),
+        "test": Task(
+            name="test",
+            cmd="pytest",
+            depends_on=[TaskDependency(task="build")],
+        ),
+    }
+
+
+@pytest.fixture
+def task_with_overrides() -> Task:
+    return Task(
+        name="clean",
+        cmd="rm -rf build/",
+        platforms={
+            "win-64": TaskOverride(cmd="rd /s /q build"),
+            "osx-arm64": TaskOverride(env={"MACOSX_DEPLOYMENT_TARGET": "11.0"}),
+        },
+    )
+
+
+@pytest.fixture
+def alias_task() -> Task:
+    return Task(
+        name="check",
+        depends_on=[
+            TaskDependency(task="test"),
+            TaskDependency(task="lint"),
+        ],
     )

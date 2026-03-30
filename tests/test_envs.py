@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-import json
+import builtins
+import logging
+import sys
+import types
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -11,8 +14,22 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from tests.conftest import CreateWorkspaceEnv
+
+from conda.base.constants import ChannelPriority, UpdateModifier
+from conda.base.context import context as conda_context
+from conda.core.envs_manager import PrefixData
+from conda.exceptions import UnsatisfiableError
+
+import conda_workspaces.envs as envs_mod
 from conda_workspaces.context import WorkspaceContext
 from conda_workspaces.envs import (
+    _apply_activation_env,
+    _apply_activation_scripts,
+    _apply_system_requirements,
+    _build_pypi_specs,
+    _channel_priority_override,
+    _install_path_deps,
     clean_all,
     get_environment_info,
     install_environment,
@@ -25,8 +42,10 @@ from conda_workspaces.models import (
     Environment,
     Feature,
     MatchSpec,
+    PyPIDependency,
     WorkspaceConfig,
 )
+from conda_workspaces.resolver import ResolvedEnvironment
 
 
 @pytest.fixture
@@ -48,22 +67,12 @@ def workspace(tmp_path: Path) -> WorkspaceContext:
     return WorkspaceContext(config)
 
 
-def _make_fake_env(ctx: WorkspaceContext, name: str, pkg_count: int = 0) -> Path:
-    """Create a fake installed environment with optional package jsons."""
-    prefix = ctx.env_prefix(name)
-    meta = prefix / "conda-meta"
-    meta.mkdir(parents=True)
-    (meta / "history").write_text("", encoding="utf-8")
-    for i in range(pkg_count):
-        content = json.dumps({"name": f"pkg-{i}"})
-        (meta / f"pkg-{i}.json").write_text(content, encoding="utf-8")
-    return prefix
-
-
 def test_remove_environment(
-    workspace: WorkspaceContext, monkeypatch: pytest.MonkeyPatch
+    workspace: WorkspaceContext,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
-    _make_fake_env(workspace, "default")
+    tmp_workspace_env(workspace.root, "default")
     assert workspace.env_exists("default")
 
     monkeypatch.setattr("conda_workspaces.envs.unregister_env", lambda path: None)
@@ -80,10 +89,12 @@ def test_remove_environment_nonexistent(
 
 
 def test_clean_all(
-    workspace: WorkspaceContext, monkeypatch: pytest.MonkeyPatch
+    workspace: WorkspaceContext,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
-    _make_fake_env(workspace, "default")
-    _make_fake_env(workspace, "test")
+    tmp_workspace_env(workspace.root, "default")
+    tmp_workspace_env(workspace.root, "test")
     assert workspace.envs_dir.is_dir()
 
     monkeypatch.setattr("conda_workspaces.envs.unregister_env", lambda path: None)
@@ -106,16 +117,21 @@ def test_clean_all_no_envs_dir(workspace: WorkspaceContext) -> None:
     ids=["empty", "single", "sorted-multiple"],
 )
 def test_list_installed_environments(
-    workspace: WorkspaceContext, env_names: list[str], expected: list[str]
+    workspace: WorkspaceContext,
+    env_names: list[str],
+    expected: list[str],
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
     for name in env_names:
-        _make_fake_env(workspace, name)
+        tmp_workspace_env(workspace.root, name)
     assert list_installed_environments(workspace) == expected
 
 
-def test_list_installed_ignores_non_conda_dirs(workspace: WorkspaceContext) -> None:
+def test_list_installed_ignores_non_conda_dirs(
+    workspace: WorkspaceContext, tmp_workspace_env: CreateWorkspaceEnv
+) -> None:
     """Directories without conda-meta should be excluded."""
-    _make_fake_env(workspace, "real")
+    tmp_workspace_env(workspace.root, "real")
     (workspace.envs_dir / "not-an-env").mkdir(parents=True)
     assert list_installed_environments(workspace) == ["real"]
 
@@ -138,9 +154,10 @@ def test_get_environment_info(
     installed: bool,
     pkg_count: int,
     expect_packages: bool,
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
     if installed:
-        _make_fake_env(workspace, "default", pkg_count=pkg_count)
+        tmp_workspace_env(workspace.root, "default", pkg_count=pkg_count)
 
     info = get_environment_info(workspace, "default")
     assert info["name"] == "default"
@@ -187,9 +204,7 @@ class FakeSolver:
 
 def _stub_conda_imports(monkeypatch: pytest.MonkeyPatch, solver: FakeSolver) -> None:
     """Patch all conda imports inside install_environment."""
-    import conda_workspaces.envs as envs_mod
 
-    # Fake plugin manager
     class FakePluginManager:
         def get_cached_solver_backend(self):
             def factory(prefix, channels, subdirs, specs_to_add=(), **kw):
@@ -210,8 +225,6 @@ def _stub_conda_imports(monkeypatch: pytest.MonkeyPatch, solver: FakeSolver) -> 
 
 def test_install_empty_specs(workspace: WorkspaceContext) -> None:
     """With no dependencies, install just creates the prefix dir."""
-    from conda_workspaces.resolver import ResolvedEnvironment
-
     resolved = ResolvedEnvironment(name="default")
     install_environment(workspace, resolved)
     assert workspace.env_prefix("default").is_dir()
@@ -235,8 +248,6 @@ def test_install_transaction_outcomes(
     expect_downloaded: bool,
     expect_executed: bool,
 ) -> None:
-    from conda_workspaces.resolver import ResolvedEnvironment
-
     txn = FakeTransaction(nothing_to_do=nothing_to_do)
     solver = FakeSolver(txn=txn)
     _stub_conda_imports(monkeypatch, solver)
@@ -254,12 +265,11 @@ def test_install_transaction_outcomes(
 
 
 def test_install_force_reinstall(
-    workspace: WorkspaceContext, monkeypatch: pytest.MonkeyPatch
+    workspace: WorkspaceContext,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
-    from conda_workspaces.resolver import ResolvedEnvironment
-
-    # Create a pre-existing environment
-    _make_fake_env(workspace, "default")
+    tmp_workspace_env(workspace.root, "default")
     assert workspace.env_exists("default")
 
     txn = FakeTransaction()
@@ -279,12 +289,12 @@ def test_install_force_reinstall(
 
 
 def test_install_existing_env_uses_freeze(
-    workspace: WorkspaceContext, monkeypatch: pytest.MonkeyPatch
+    workspace: WorkspaceContext,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_workspace_env: CreateWorkspaceEnv,
 ) -> None:
     """Updating an existing env passes UpdateModifier.FREEZE_INSTALLED."""
-    from conda_workspaces.resolver import ResolvedEnvironment
-
-    _make_fake_env(workspace, "default")
+    tmp_workspace_env(workspace.root, "default")
 
     recorded_kwargs: dict = {}
 
@@ -295,8 +305,6 @@ def test_install_existing_env_uses_freeze(
         def solve_for_transaction(self, **kwargs):
             recorded_kwargs.update(kwargs)
             return FakeTransaction()
-
-    import conda_workspaces.envs as envs_mod
 
     class FakePluginManager:
         def get_cached_solver_backend(self):
@@ -315,26 +323,18 @@ def test_install_existing_env_uses_freeze(
     )
     install_environment(workspace, resolved)
 
-    from conda.base.constants import UpdateModifier
-
     assert recorded_kwargs.get("update_modifier") is UpdateModifier.FREEZE_INSTALLED
 
 
 def test_install_solve_error(
     workspace: WorkspaceContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from conda.exceptions import UnsatisfiableError
-
-    from conda_workspaces.resolver import ResolvedEnvironment
-
     class FailingSolver:
         def __init__(self, prefix, channels, subdirs, specs_to_add=(), **kw):
             pass
 
         def solve_for_transaction(self, **kwargs):
             raise UnsatisfiableError({})
-
-    import conda_workspaces.envs as envs_mod
 
     class FakePluginManager:
         def get_cached_solver_backend(self):
@@ -358,9 +358,6 @@ def test_install_solve_error(
 def test_install_no_solver_backend(
     workspace: WorkspaceContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import conda_workspaces.envs as envs_mod
-    from conda_workspaces.resolver import ResolvedEnvironment
-
     class FakePluginManager:
         def get_cached_solver_backend(self):
             return None
@@ -380,19 +377,107 @@ def test_install_no_solver_backend(
         install_environment(workspace, resolved)
 
 
-def test_install_pypi_deps_no_conda_pypi(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.fixture
+def fake_pypi_translate(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Inject a fake ``conda_pypi.translate`` module into sys.modules."""
+    conda_pypi = types.ModuleType("conda_pypi")
+    tr_mod = types.ModuleType("conda_pypi.translate")
+    tr_mod.pypi_to_conda_name = lambda n: n.replace("-", "_")
+
+    monkeypatch.setitem(sys.modules, "conda_pypi", conda_pypi)
+    monkeypatch.setitem(sys.modules, "conda_pypi.translate", tr_mod)
+
+
+@pytest.fixture
+def block_conda_pypi(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make all ``conda_pypi.*`` imports raise ImportError."""
+    real_import = builtins.__import__
+
+    def _block(name, *args, **kwargs):
+        if name.startswith("conda_pypi"):
+            raise ImportError("no conda-pypi")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _block)
+
+
+@pytest.mark.parametrize(
+    "dep, expected_name",
+    [
+        (
+            {"name": "my-package", "spec": ">=2.0"},
+            "my_package",
+        ),
+        (
+            {"name": "requests", "spec": ">=2.28", "extras": ("security", "socks")},
+            "requests",
+        ),
+    ],
+    ids=["translates-names", "handles-extras"],
+)
+def test_build_pypi_specs(
+    fake_pypi_translate: None,
+    dep: dict,
+    expected_name: str,
+) -> None:
+    """_build_pypi_specs translates names and builds valid MatchSpecs."""
+    pypi_dep = PyPIDependency(**dep)
+    resolved = ResolvedEnvironment(
+        name="default",
+        pypi_dependencies={dep["name"]: pypi_dep},
+    )
+    specs = _build_pypi_specs(resolved)
+
+    assert len(specs) == 1
+    assert specs[0].name == expected_name
+
+
+def test_build_pypi_specs_skips_path_deps(
+    fake_pypi_translate: None,
+) -> None:
+    """Path/git/url deps are excluded (handled by _install_path_deps)."""
+    resolved = ResolvedEnvironment(
+        name="default",
+        pypi_dependencies={
+            "local-pkg": PyPIDependency(name="local-pkg", path="./local"),
+            "git-pkg": PyPIDependency(
+                name="git-pkg", git="https://example.com/repo.git"
+            ),
+            "url-pkg": PyPIDependency(
+                name="url-pkg", url="https://example.com/pkg.whl"
+            ),
+            "normal": PyPIDependency(name="normal", spec=">=1.0"),
+        },
+    )
+    specs = _build_pypi_specs(resolved)
+
+    assert len(specs) == 1
+    assert specs[0].name == "normal"
+
+
+@pytest.mark.parametrize(
+    "pypi_deps",
+    [
+        {},
+        {
+            "local": {"name": "local", "path": "./src"},
+            "vcs": {"name": "vcs", "git": "https://example.com/repo.git"},
+        },
+    ],
+    ids=["empty-deps", "all-path-deps"],
+)
+def test_build_pypi_specs_returns_empty(pypi_deps: dict) -> None:
+    """Returns [] without importing conda-pypi when no indexable deps exist."""
+    deps = {k: PyPIDependency(**v) for k, v in pypi_deps.items()}
+    resolved = ResolvedEnvironment(name="default", pypi_dependencies=deps)
+    assert _build_pypi_specs(resolved) == []
+
+
+def test_build_pypi_specs_no_conda_pypi(
+    block_conda_pypi: None,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """When conda-pypi is not installed, warns and returns."""
-    import builtins
-    import logging
-
-    from conda_workspaces.envs import _install_pypi_deps
-    from conda_workspaces.models import PyPIDependency
-    from conda_workspaces.resolver import ResolvedEnvironment
-
+    """Returns empty list and warns when conda-pypi is not installed."""
     resolved = ResolvedEnvironment(
         name="default",
         pypi_dependencies={
@@ -400,136 +485,351 @@ def test_install_pypi_deps_no_conda_pypi(
         },
     )
 
-    real_import = builtins.__import__
+    with caplog.at_level(logging.WARNING):
+        specs = _build_pypi_specs(resolved)
 
-    def _block_conda_pypi(name, *args, **kwargs):
-        if name.startswith("conda_pypi"):
-            raise ImportError("no conda-pypi")
-        return real_import(name, *args, **kwargs)
+    assert specs == []
+    assert "conda-pypi is not installed" in caplog.text
 
-    monkeypatch.setattr(builtins, "__import__", _block_conda_pypi)
+
+def test_install_path_deps_no_conda_pypi(
+    block_conda_pypi: None,
+    caplog: pytest.LogCaptureFixture,
+    tmp_path: Path,
+) -> None:
+    """Warns and skips when conda-pypi is not installed."""
+    resolved = ResolvedEnvironment(
+        name="default",
+        pypi_dependencies={
+            "local": PyPIDependency(name="local", path="./src", editable=True),
+        },
+    )
 
     with caplog.at_level(logging.WARNING):
-        _install_pypi_deps(tmp_path, resolved)
+        _install_path_deps(tmp_path, resolved)
 
     assert "conda-pypi is not installed" in caplog.text
-    assert "requests" in caplog.text
 
 
-def test_install_pypi_deps_success(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """When conda-pypi is available, calls ConvertTree + run_conda_install."""
-    import sys
-    import types
-
-    from conda_workspaces.envs import _install_pypi_deps
-    from conda_workspaces.models import PyPIDependency
-    from conda_workspaces.resolver import ResolvedEnvironment
-
+def test_install_path_deps_skips_normal(tmp_path: Path) -> None:
+    """Normal (non-path/git/url) deps are not processed."""
     resolved = ResolvedEnvironment(
         name="default",
         pypi_dependencies={
             "requests": PyPIDependency(name="requests", spec=">=2.28"),
         },
     )
-
-    convert_calls: list[list] = []
-    install_calls: list[dict] = []
-
-    def fake_convert_tree_factory(prefix):
-        repo = tmp_path / "conda-pypi-repo"
-        repo.mkdir(exist_ok=True)
-
-        class _ct:
-            pass
-
-        ct = _ct()
-        ct.repo = repo
-
-        def convert(specs):
-            convert_calls.append(specs)
-
-        ct.convert_tree = convert
-        return ct
-
-    def fake_run_conda_install(prefix, specs, **kwargs):
-        install_calls.append({"prefix": prefix, "specs": specs, **kwargs})
-        return 0
-
-    # Wire up fake conda_pypi modules via sys.modules
-    conda_pypi = types.ModuleType("conda_pypi")
-    ct_mod = types.ModuleType("conda_pypi.convert_tree")
-    ct_mod.ConvertTree = fake_convert_tree_factory
-    main_mod = types.ModuleType("conda_pypi.main")
-    main_mod.run_conda_install = fake_run_conda_install
-    tr_mod = types.ModuleType("conda_pypi.translate")
-    tr_mod.pypi_to_conda_name = lambda n: n.replace("-", "_")
-
-    monkeypatch.setitem(sys.modules, "conda_pypi", conda_pypi)
-    monkeypatch.setitem(sys.modules, "conda_pypi.convert_tree", ct_mod)
-    monkeypatch.setitem(sys.modules, "conda_pypi.main", main_mod)
-    monkeypatch.setitem(sys.modules, "conda_pypi.translate", tr_mod)
-
-    _install_pypi_deps(tmp_path, resolved)
-
-    assert len(convert_calls) == 1
-    assert len(install_calls) == 1
-    assert install_calls[0]["yes"] is True
-    assert install_calls[0]["quiet"] is True
+    _install_path_deps(tmp_path, resolved)
 
 
-def test_install_pypi_deps_exception_warns(
+def test_install_path_deps_warns_git_url(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """When convert_tree raises, logs warning and continues."""
-    import logging
-    import sys
-    import types
+    """Git and URL deps are warned about and skipped."""
+    resolved = ResolvedEnvironment(
+        name="default",
+        pypi_dependencies={
+            "vcs": PyPIDependency(name="vcs", git="https://example.com/repo.git"),
+            "remote": PyPIDependency(name="remote", url="https://example.com/pkg.whl"),
+        },
+    )
 
-    from conda_workspaces.envs import _install_pypi_deps
-    from conda_workspaces.models import PyPIDependency
-    from conda_workspaces.resolver import ResolvedEnvironment
+    with caplog.at_level(logging.WARNING):
+        _install_path_deps(tmp_path, resolved)
+
+    assert "not yet supported" in caplog.text
+
+
+@pytest.fixture
+def fake_pypi_build(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """Inject fake ``conda_pypi.build`` and ``conda_pypi.installer`` modules.
+
+    Returns ``(build_calls, install_calls)`` lists that record invocations.
+    The default ``pypa_to_conda`` succeeds; override ``build_mod.pypa_to_conda``
+    via monkeypatch to simulate failures.
+    """
+    build_calls: list[dict] = []
+    install_calls: list = []
+
+    sentinel_package = tmp_path / "built.conda"
+    sentinel_package.touch()
+
+    def fake_pypa_to_conda(project, **kwargs):
+        build_calls.append({"project": project, **kwargs})
+        return sentinel_package
+
+    def fake_install_ephemeral(prefix, package):
+        install_calls.append(package)
+
+    conda_pypi = types.ModuleType("conda_pypi")
+    build_mod = types.ModuleType("conda_pypi.build")
+    build_mod.pypa_to_conda = fake_pypa_to_conda
+    inst_mod = types.ModuleType("conda_pypi.installer")
+    inst_mod.install_ephemeral_conda = fake_install_ephemeral
+
+    monkeypatch.setitem(sys.modules, "conda_pypi", conda_pypi)
+    monkeypatch.setitem(sys.modules, "conda_pypi.build", build_mod)
+    monkeypatch.setitem(sys.modules, "conda_pypi.installer", inst_mod)
+
+    return build_calls, install_calls, build_mod, sentinel_package
+
+
+def test_install_path_deps_success(
+    fake_pypi_build: tuple,
+    tmp_path: Path,
+) -> None:
+    """When conda-pypi is available, builds and installs path deps."""
+    build_calls, install_calls, _, sentinel_package = fake_pypi_build
 
     resolved = ResolvedEnvironment(
         name="default",
-        pypi_dependencies={"flask": PyPIDependency(name="flask")},
+        pypi_dependencies={
+            "local": PyPIDependency(name="local", path="./src", editable=True),
+        },
+    )
+    _install_path_deps(tmp_path, resolved)
+
+    assert len(build_calls) == 1
+    assert build_calls[0]["distribution"] == "editable"
+    assert len(install_calls) == 1
+    assert install_calls[0] == sentinel_package
+
+
+def test_install_path_deps_build_failure_warns(
+    fake_pypi_build: tuple,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """When pypa_to_conda raises, logs warning and continues."""
+    _, _, build_mod, _ = fake_pypi_build
+
+    def broken_build(project, **kwargs):
+        raise RuntimeError("build exploded")
+
+    build_mod.pypa_to_conda = broken_build
+    monkeypatch.setitem(sys.modules, "conda_pypi.build", build_mod)
+
+    resolved = ResolvedEnvironment(
+        name="default",
+        pypi_dependencies={
+            "broken": PyPIDependency(name="broken", path="./broken"),
+        },
     )
 
-    def broken_factory(prefix):
-        repo = tmp_path / "repo"
-        repo.mkdir(exist_ok=True)
+    with caplog.at_level(logging.WARNING):
+        _install_path_deps(tmp_path, resolved)
 
-        class _ct:
-            pass
+    assert "Failed to install" in caplog.text
+    assert "broken" in caplog.text
 
-        ct = _ct()
-        ct.repo = repo
 
-        def convert(specs):
-            raise RuntimeError("download failed")
+def test_install_merges_pypi_specs_into_solver(
+    workspace: WorkspaceContext,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_pypi_translate: None,
+) -> None:
+    """PyPI deps are translated and passed to the solver alongside conda deps."""
+    txn = FakeTransaction()
+    solver = FakeSolver(txn=txn)
+    _stub_conda_imports(monkeypatch, solver)
 
-        ct.convert_tree = convert
-        return ct
+    resolved = ResolvedEnvironment(
+        name="default",
+        conda_dependencies={"python": MatchSpec("python >=3.10")},
+        pypi_dependencies={
+            "my-lib": PyPIDependency(name="my-lib", spec=">=1.0"),
+        },
+        channels=[Channel("conda-forge")],
+    )
+    install_environment(workspace, resolved)
 
-    conda_pypi = types.ModuleType("conda_pypi")
-    ct_mod = types.ModuleType("conda_pypi.convert_tree")
-    ct_mod.ConvertTree = broken_factory
-    main_mod = types.ModuleType("conda_pypi.main")
-    main_mod.run_conda_install = lambda *a, **kw: 0
-    tr_mod = types.ModuleType("conda_pypi.translate")
-    tr_mod.pypi_to_conda_name = lambda n: n
+    spec_names = {s.name for s in solver.specs_to_add}
+    assert "python" in spec_names
+    assert "my_lib" in spec_names
 
-    monkeypatch.setitem(sys.modules, "conda_pypi", conda_pypi)
-    monkeypatch.setitem(sys.modules, "conda_pypi.convert_tree", ct_mod)
-    monkeypatch.setitem(sys.modules, "conda_pypi.main", main_mod)
-    monkeypatch.setitem(sys.modules, "conda_pypi.translate", tr_mod)
+
+def test_apply_activation_env(
+    workspace: WorkspaceContext,
+    tmp_workspace_env: CreateWorkspaceEnv,
+) -> None:
+    """activation_env vars are written to the prefix state file."""
+    prefix = tmp_workspace_env(workspace.root, "default")
+
+    _apply_activation_env(prefix, {"MY_VAR": "hello", "OTHER": "world"})
+
+    pd = PrefixData(str(prefix))
+    env_vars = pd.get_environment_env_vars()
+    assert env_vars["MY_VAR"] == "hello"
+    assert env_vars["OTHER"] == "world"
+
+
+def test_apply_activation_env_empty(
+    workspace: WorkspaceContext,
+    tmp_workspace_env: CreateWorkspaceEnv,
+) -> None:
+    """Empty env dict is a no-op."""
+    prefix = tmp_workspace_env(workspace.root, "default")
+    _apply_activation_env(prefix, {})
+
+
+def test_apply_activation_scripts(
+    workspace: WorkspaceContext,
+    tmp_workspace_env: CreateWorkspaceEnv,
+) -> None:
+    """Activation scripts are copied to $PREFIX/etc/conda/activate.d/."""
+    prefix = tmp_workspace_env(workspace.root, "default")
+
+    script = workspace.root / "setup.sh"
+    script.write_text("#!/bin/sh\nexport FOO=bar\n", encoding="utf-8")
+
+    _apply_activation_scripts(prefix, [str(script)])
+
+    dest = prefix / "etc" / "conda" / "activate.d" / "setup.sh"
+    assert dest.exists()
+    assert "FOO=bar" in dest.read_text(encoding="utf-8")
+
+
+def test_apply_activation_scripts_missing(
+    workspace: WorkspaceContext,
+    tmp_workspace_env: CreateWorkspaceEnv,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Missing scripts are skipped with a warning."""
+    prefix = tmp_workspace_env(workspace.root, "default")
 
     with caplog.at_level(logging.WARNING):
-        _install_pypi_deps(tmp_path, resolved)
+        _apply_activation_scripts(prefix, ["/nonexistent/script.sh"])
 
-    assert "Failed to install PyPI dependencies" in caplog.text
-    assert "flask" in caplog.text
+    assert "skipping" in caplog.text
+
+
+def test_apply_activation_scripts_empty(
+    workspace: WorkspaceContext,
+    tmp_workspace_env: CreateWorkspaceEnv,
+) -> None:
+    """Empty scripts list is a no-op."""
+    prefix = tmp_workspace_env(workspace.root, "default")
+    _apply_activation_scripts(prefix, [])
+    assert not (prefix / "etc" / "conda" / "activate.d").exists()
+
+
+@pytest.mark.parametrize(
+    "sys_reqs, initial_specs, expected_names",
+    [
+        (
+            {"glibc": "2.17", "cuda": "12.0"},
+            [MatchSpec("python >=3.10")],
+            {"python", "__glibc", "__cuda"},
+        ),
+        (
+            {"__linux": "5.15"},
+            [],
+            {"__linux"},
+        ),
+    ],
+    ids=["auto-prefix", "already-prefixed"],
+)
+def test_apply_system_requirements(
+    sys_reqs: dict[str, str],
+    initial_specs: list[MatchSpec],
+    expected_names: set[str],
+) -> None:
+    """system_requirements adds virtual package specs without double-prefixing."""
+    resolved = ResolvedEnvironment(name="test", system_requirements=sys_reqs)
+    result = _apply_system_requirements(resolved, initial_specs)
+
+    assert {str(s.name) for s in result} == expected_names
+
+
+def test_channel_priority_override() -> None:
+    """_channel_priority_override temporarily changes context.channel_priority."""
+    original = conda_context.channel_priority
+
+    with _channel_priority_override("strict"):
+        assert conda_context.channel_priority == ChannelPriority.STRICT
+
+    assert conda_context.channel_priority == original
+
+
+def test_channel_priority_override_none() -> None:
+    """None priority is a no-op."""
+    original = conda_context.channel_priority
+    with _channel_priority_override(None):
+        assert conda_context.channel_priority == original
+
+
+def test_install_applies_activation_after_transaction(
+    workspace: WorkspaceContext,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_workspace_env: CreateWorkspaceEnv,
+) -> None:
+    """Activation env vars and scripts are applied post-install."""
+    # Pre-create the prefix so FakeTransaction.execute() has conda-meta/ in place
+    tmp_workspace_env(workspace.root, "default")
+
+    txn = FakeTransaction()
+    solver = FakeSolver(txn=txn)
+    _stub_conda_imports(monkeypatch, solver)
+
+    script = workspace.root / "activate.sh"
+    script.write_text("#!/bin/sh\nexport PROJ=1\n", encoding="utf-8")
+
+    resolved = ResolvedEnvironment(
+        name="default",
+        conda_dependencies={"python": MatchSpec("python >=3.10")},
+        channels=[Channel("conda-forge")],
+        activation_env={"PROJECT_ROOT": str(workspace.root)},
+        activation_scripts=[str(script)],
+    )
+    install_environment(workspace, resolved)
+
+    assert txn.executed
+
+    prefix = workspace.env_prefix("default")
+    pd = PrefixData(str(prefix))
+    env_vars = pd.get_environment_env_vars()
+    assert env_vars["PROJECT_ROOT"] == str(workspace.root)
+
+    activate_d = prefix / "etc" / "conda" / "activate.d" / "activate.sh"
+    assert activate_d.exists()
+
+
+def test_install_applies_channel_priority(
+    workspace: WorkspaceContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """install_environment respects channel_priority from the manifest."""
+    recorded_priority: list[ChannelPriority] = []
+
+    class PriorityRecordingSolver:
+        def __init__(self, prefix, channels, subdirs, specs_to_add=(), **kw):
+            recorded_priority.append(conda_context.channel_priority)
+
+        def solve_for_transaction(self, **kwargs):
+            return FakeTransaction()
+
+    class FakePluginManager:
+        def get_cached_solver_backend(self):
+            return PriorityRecordingSolver
+
+    class FakeContext:
+        plugin_manager = FakePluginManager()
+        subdirs = ("linux-64", "noarch")
+        channel_priority = ChannelPriority.FLEXIBLE
+
+        def _override(self, key, value):
+            return conda_context._override(key, value)
+
+    monkeypatch.setattr(envs_mod, "conda_context", FakeContext())
+
+    resolved = ResolvedEnvironment(
+        name="default",
+        conda_dependencies={"python": MatchSpec("python >=3.10")},
+        channels=[Channel("conda-forge")],
+        channel_priority="strict",
+    )
+    install_environment(workspace, resolved)
+
+    assert recorded_priority[0] == ChannelPriority.STRICT

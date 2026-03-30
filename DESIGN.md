@@ -11,9 +11,11 @@ multi-environment workspace management to conda.  It reads pixi-compatible
 manifest files (`pixi.toml`, `conda.toml`, `pyproject.toml`) and manages
 project-local conda environments under `.conda/envs/`.
 
-The plugin registers a `conda workspace` subcommand (with `cw` as a
-standalone shortcut) that provides `init`, `install`, `lock`, `list`,
-`info`, `add`, `remove`, `clean`, `run`, and `activate` subcommands.
+The plugin registers two subcommands: `conda workspace` (with `cw` as a
+standalone shortcut) for environment management (`init`, `install`,
+`lock`, `list`, `envs`, `info`, `add`, `remove`, `clean`, `run`,
+`shell`, `activate`) and `conda task` (with `ct` as a shortcut) for
+task execution (`run`, `list`, `add`, `remove`, `export`).
 
 ## Goals
 
@@ -47,20 +49,17 @@ standalone shortcut) that provides `init`, `install`, `lock`, `list`,
 | `[pypi-dependencies]` | `PyPIDependency` model | Requires conda-pypi for install |
 | `[feature.<name>]` | `Feature` dataclass | Full feature composition |
 | `[environments]` | `Environment` dataclass | Including `no-default-feature` |
-| `solve-group` | Stored on `Environment` | See challenges below |
-| `[activation]` | `activation_scripts`, `activation_env` | Scripts and env vars |
-| `[system-requirements]` | Stored on features | Validated during install |
+| `[activation]` | `activation_scripts`, `activation_env` | Scripts copied to activate.d/, env vars set via PrefixData |
+| `[system-requirements]` | Virtual package constraints | Added as `__glibc >=X`, `__cuda >=Y` specs during solving |
 | `[target.<platform>]` | `target_conda_dependencies` | Per-platform overrides |
 | `channel-priority` | Mapped to conda setting | `strict` / `flexible` / `disabled` |
 | Inline tables `{version = "...", build = "..."}` | Parsed via tomlkit | Dict-form deps |
 
-### Partially Supported
+### Accepted but Ignored
 
-| Pixi concept | Status | Challenge |
-|---|---|---|
-| `solve-group` | Stored but not enforced | conda's solver operates on one environment at a time; true cross-environment coordinated solving requires either (a) a union solve followed by subset pinning, or (b) solver-level support for grouped solves. **Current approach**: solve the union of all specs in a group, then pin exact versions when creating individual environments. |
-| `pypi-dependencies` | Parsed, installed via conda-pypi | Stored in the model and installed via conda-pypi when available. If conda-pypi is not installed, a warning is emitted listing the skipped packages. |
-| `[activation.scripts]` | Stored, not auto-run | conda activation handles `activate.d/` scripts; custom scripts would need to be symlinked or copied into the prefix. |
+| Pixi concept | Status |
+|---|---|
+| `solve-group` | Accepted in manifests for compatibility but has no effect. Conda's solver operates on one environment at a time and does not support cross-environment version coordination. |
 
 ### Not Supported (Pixi-Only Concepts)
 
@@ -68,7 +67,7 @@ standalone shortcut) that provides `init`, `install`, `lock`, `list`,
 |---|---|
 | `[package]` / pixi-build | Pixi's build system uses rattler-build with custom backends. conda uses conda-build or rattler-build directly. These are fundamentally different build orchestration systems. |
 | `[host-dependencies]` / `[build-dependencies]` | Part of the `[package]` build model. Not applicable outside pixi-build. |
-| `deno_task_shell` | Pixi tasks use a Deno-compatible shell. conda-tasks handles task execution separately; no overlap with workspace management. |
+| `deno_task_shell` | Pixi tasks use a Deno-compatible shell for cross-platform execution. conda-workspaces uses the native platform shell (`sh` on Unix, `cmd` on Windows) and provides platform overrides and Jinja2 conditionals for cross-platform support. |
 | `tool.pixi.project.conda-pypi-map` | Pixi's custom mapping for conda↔PyPI name translation. conda-pypi handles this differently. |
 
 ## Key Design Decisions
@@ -111,16 +110,6 @@ For each environment:
 2. Feed specs + channels to `conda create` / `conda install`
 3. Let libmamba handle constraint resolution
 
-**Solve-groups** are a challenge because conda's solver doesn't natively
-support solving multiple environments simultaneously.  The planned
-approach:
-
-- For environments in the same solve-group, first solve the union of
-  all their specs to get a single consistent solution
-- Then create each environment using the exact versions from that
-  solution (pinned specs)
-- This ensures version consistency across the group
-
 ### 4. conda-native Format (conda.toml)
 
 While pixi.toml is the primary format, a `conda.toml` is also
@@ -142,7 +131,37 @@ require going through `conda workspace ...`.  This is registered via
 cw = "conda_workspaces.__main__:main"
 ```
 
-Similarly, conda-tasks provides `ct` as a shortcut for `conda task`.
+Similarly, `ct` provides a shortcut for `conda task`.
+
+### 6. Task System Architecture
+
+The task runner is built into conda-workspaces. Tasks are parsed from
+the same manifest files as
+workspace definitions and share the parser infrastructure.
+
+**Execution pipeline**:
+
+1. **Parse** — manifest parsers produce `dict[str, Task]` via
+   `detect_and_parse_tasks()`. Platform overrides are resolved for the
+   current `context.subdir`.
+2. **Resolve** — `graph.resolve_execution_order()` builds a DAG from
+   `depends-on` declarations and returns a topologically sorted list.
+3. **Render** — `template.render()` expands Jinja2 variables
+   (`{{ conda.platform }}`, task args) in command strings and env vars.
+4. **Cache check** — when `inputs` and `outputs` are declared,
+   `cache.is_cached()` compares `(mtime, size, sha256)` fingerprints
+   against a `.conda/task-cache/` store. Cached tasks are skipped.
+5. **Execute** — `runner.SubprocessShell.run()` executes the rendered
+   command in the native platform shell, optionally inside an activated
+   conda environment via `conda.utils.wrap_subprocess_call`.
+6. **Cache save** — after successful execution, fingerprints are written
+   to the cache store.
+
+**Design rationale**: Tasks use the native platform shell rather than a
+cross-platform shell runtime. This trades pixi's `deno_task_shell`
+portability for zero additional dependencies and familiar shell
+behaviour. Platform-specific commands are handled via `[target.<platform>.tasks]`
+overrides or Jinja2 conditionals.
 
 ## Differences from Pixi
 
@@ -182,18 +201,14 @@ Similarly, conda-tasks provides `ct` as a shortcut for `conda task`.
 
 ### Practical Challenges
 
-1. **Solve-group coordination** requires either solver-level changes or
-   a two-pass approach (union solve → pinned install).  Neither is
-   trivial; the two-pass approach is the planned implementation.
-
-2. **PyPI dependency installation** depends on conda-pypi being
+1. **PyPI dependency installation** depends on conda-pypi being
    installed.  Without it, PyPI deps are parsed but cannot be installed.
 
-3. **Platform parity** — pixi supports platforms that conda may not
+2. **Platform parity** — pixi supports platforms that conda may not
    have complete channel coverage for (e.g., `linux-aarch64` has
    fewer packages on some channels).
 
-4. **Manifest drift** — as pixi evolves its manifest format, 
+3. **Manifest drift** — as pixi evolves its manifest format,
    conda-workspaces must track changes to remain compatible.  Pixi's
    format is not formally standardized outside the pixi project.
 
@@ -260,15 +275,22 @@ plugin.
 
 ### conda-pypi Integration
 
-When `install_environment()` encounters PyPI dependencies and
-`conda-pypi` is installed, it uses conda-pypi's `ConvertTree` to
-download wheels from PyPI, convert them to `.conda` packages in a
-local channel, and then installs them via `run_conda_install`.  This
-means PyPI dependencies end up as real conda packages in the prefix —
-no pip shim, no `site-packages` side-channel.  If `conda-pypi` is
-not available, a warning is logged listing the skipped packages.  This
-keeps conda-pypi as an optional dependency — workspaces that only use
-conda packages never need it.
+PyPI dependencies are handled in two phases:
+
+1. **Standard PyPI deps** (version-spec only) are translated to conda
+   package names via `conda-pypi`'s `pypi_to_conda_name` (using the
+   grayskull mapping) and merged directly into the solver call alongside
+   conda specs. The rattler solver + conda-pypi's wheel extractor
+   resolve and install everything in a single pass.
+
+2. **Path-based PyPI deps** (`path = ".", editable = true`) are built
+   into `.conda` packages via `conda-pypi`'s `pypa_to_conda` after the
+   main solve completes, then installed with `install_ephemeral_conda`.
+
+Git and URL PyPI dependencies are not yet supported and are skipped
+with a warning. If `conda-pypi` is not installed, all PyPI dependencies
+are skipped with a warning. This keeps conda-pypi as an optional
+dependency — workspaces that only use conda packages never need it.
 
 The environment specifiers also surface PyPI dependencies as
 `external_packages` (under the `"pip"` key) so that conda's own
@@ -276,7 +298,6 @@ reporting and downstream tools can see them.
 
 ## Future Work
 
-- **Solve-group enforcement**: Implement the two-pass solve strategy.
 - **conda-build integration**: Build packages from workspace members
   using conda-build recipes.
 - **Multi-package workspaces**: Support monorepo layouts where

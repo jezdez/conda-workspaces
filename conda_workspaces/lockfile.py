@@ -19,8 +19,8 @@ The format is a YAML document with three top-level keys::
         depends: [...]
         ...
 
-On the *write* side, ``generate_lockfile`` snapshots every installed
-environment.  On the *read* side, ``install_from_lockfile`` extracts
+On the *write* side, ``generate_lockfile`` solves each environment
+and records the result.  On the *read* side, ``install_from_lockfile`` extracts
 the package list for one environment + platform and installs the exact
 URLs, bypassing the solver entirely.
 """
@@ -32,15 +32,15 @@ from typing import TYPE_CHECKING
 
 from conda.common.serialize.yaml import dump as yaml_dump
 from conda.common.serialize.yaml import load as yaml_load
-from conda.models.environment import Environment
 from conda_lockfiles.rattler_lock.v6 import _record_to_dict
 
-from .exceptions import LockfileNotFoundError
+from .exceptions import LockfileNotFoundError, SolveError
 
 if TYPE_CHECKING:
     from typing import Any
 
     from .context import WorkspaceContext
+    from .resolver import ResolvedEnvironment
 
 #: Lockfile format version.
 LOCKFILE_VERSION = 1
@@ -54,20 +54,14 @@ def lockfile_path(ctx: WorkspaceContext) -> Path:
     return ctx.root / LOCKFILE_NAME
 
 
-def lockfile_exists(ctx: WorkspaceContext) -> bool:
-    """Check whether a lockfile exists for the workspace."""
-    return lockfile_path(ctx).is_file()
-
-
 def _build_lockfile_dict(
-    environments: dict[str, Environment],
+    environments: dict[tuple[str, str], list],
     channels_by_env: dict[str, list[str]],
 ) -> dict[str, Any]:
-    """Build the lockfile dict from a set of Environment objects.
+    """Build the lockfile dict from solved package records.
 
-    *environments* maps ``(env_name, platform)`` pairs to
-    :class:`~conda.models.environment.Environment` objects — each
-    entry represents one environment on one platform.
+    *environments* maps ``(env_name, platform)`` pairs to lists of
+    :class:`~conda.models.records.PackageRecord` objects.
 
     *channels_by_env* maps environment names to ordered channel URLs.
     """
@@ -75,8 +69,7 @@ def _build_lockfile_dict(
     packages: list[dict[str, Any]] = []
     envs_dict: dict[str, dict[str, Any]] = {}
 
-    for (env_name, platform), env in sorted(environments.items()):
-        # Per-environment entry
+    for (env_name, platform), records in sorted(environments.items()):
         if env_name not in envs_dict:
             channels = channels_by_env.get(env_name, [])
             envs_dict[env_name] = {
@@ -84,9 +77,8 @@ def _build_lockfile_dict(
                 "packages": {},
             }
 
-        # Per-platform package references
         platform_refs: list[dict[str, str]] = []
-        for pkg in sorted(env.explicit_packages, key=lambda p: p.name):
+        for pkg in sorted(records, key=lambda p: p.name):
             platform_refs.append({"conda": pkg.url})
             if pkg.url not in seen_urls:
                 packages.append(_record_to_dict(pkg))
@@ -101,36 +93,93 @@ def _build_lockfile_dict(
     }
 
 
+def _solve_for_records(
+    ctx: WorkspaceContext,
+    resolved: ResolvedEnvironment,
+) -> list:
+    """Solve an environment and return the resulting package records.
+
+    Uses conda's solver API to resolve dependencies without installing,
+    producing the list of exact packages that would be installed.
+    Applies the same transformations as ``install_environment``:
+    PyPI deps are translated and merged, system requirements are added
+    as virtual package constraints, and channel priority is honoured.
+    """
+    from conda.base.context import context as conda_context
+    from conda.exceptions import UnsatisfiableError
+    from conda.models.match_spec import MatchSpec
+
+    from .envs import (
+        _apply_system_requirements,
+        _build_pypi_specs,
+        _channel_priority_override,
+    )
+
+    specs = [
+        MatchSpec(dep.conda_build_form())
+        for dep in resolved.conda_dependencies.values()
+    ]
+
+    specs.extend(_build_pypi_specs(resolved))
+    _apply_system_requirements(resolved, specs)
+
+    if not specs:
+        return []
+
+    solver_backend = conda_context.plugin_manager.get_cached_solver_backend()
+    if solver_backend is None:
+        raise SolveError(resolved.name, "No solver backend found")
+
+    prefix = str(ctx.env_prefix(resolved.name))
+
+    with _channel_priority_override(resolved.channel_priority):
+        solver = solver_backend(
+            prefix,
+            list(resolved.channels),
+            conda_context.subdirs,
+            specs_to_add=specs,
+        )
+
+        try:
+            return list(solver.solve_final_state())
+        except (UnsatisfiableError, SystemExit) as exc:
+            raise SolveError(resolved.name, str(exc)) from exc
+
+
 def generate_lockfile(
     ctx: WorkspaceContext,
-    env_names: list[str] | None = None,
+    resolved_envs: dict[str, ResolvedEnvironment],
 ) -> Path:
-    """Generate a ``conda.lock`` from installed workspace environments.
+    """Generate a ``conda.lock`` by solving workspace environments.
 
-    Snapshots every installed environment (or only *env_names* when
-    given) into a single ``conda.lock`` YAML file at the workspace
-    root.
+    Solves each environment in *resolved_envs* and writes the results
+    to a single ``conda.lock`` YAML file at the workspace root.
+    Solver output is suppressed to avoid noise since the caller
+    provides its own status messages.
 
     Returns the path to the generated lockfile.
     """
-    if env_names is None:
-        env_names = [name for name in ctx.config.environments if ctx.env_exists(name)]
+    import os
+    import sys
+
+    from conda.base.context import context as conda_context
 
     platform = ctx.platform
-    environments: dict[tuple[str, str], Environment] = {}
+    environments: dict[tuple[str, str], list] = {}
     channels_by_env: dict[str, list[str]] = {}
 
-    for name in env_names:
-        prefix = ctx.env_prefix(name)
-        env = Environment.from_prefix(
-            prefix=str(prefix),
-            name=name,
-            platform=platform,
-        )
-        environments[(name, platform)] = env
-
-        # Resolve channels from workspace config
-        channels_by_env[name] = [str(ch) for ch in ctx.config.channels]
+    with conda_context._override("quiet", True):
+        real_stdout = sys.stdout
+        devnull = open(os.devnull, "w")
+        try:
+            sys.stdout = devnull
+            for name, resolved in resolved_envs.items():
+                records = _solve_for_records(ctx, resolved)
+                environments[(name, platform)] = records
+                channels_by_env[name] = [str(ch) for ch in resolved.channels]
+        finally:
+            sys.stdout = real_stdout
+            devnull.close()
 
     data = _build_lockfile_dict(environments, channels_by_env)
 
@@ -145,7 +194,7 @@ def _read_lockfile_data(ctx: WorkspaceContext) -> dict[str, Any]:
     path = lockfile_path(ctx)
     if not path.is_file():
         raise LockfileNotFoundError("(all)", path)
-    with path.open() as fh:
+    with path.open(encoding="utf-8") as fh:
         return yaml_load(fh)
 
 
@@ -215,8 +264,11 @@ def install_from_lockfile(ctx: WorkspaceContext, env_name: str) -> None:
     prefix = ctx.env_prefix(env_name)
     prefix.mkdir(parents=True, exist_ok=True)
 
+    import sys
+
     records = get_package_records_from_explicit(urls)
     install_explicit_packages(
         package_cache_records=list(records),
         prefix=str(prefix),
     )
+    sys.stdout.flush()

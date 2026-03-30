@@ -1,0 +1,15 @@
+[workspace]
+name = "my-project"
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64"]
+
+[dependencies]
+python = ">=3.12"
+pytest = "*"
+
+[tasks]
+hello = "echo 'Hello from conda tasks!'"
+
+[tasks.test]
+cmd = "python -m pytest --version"
+depends-on = ["hello"]

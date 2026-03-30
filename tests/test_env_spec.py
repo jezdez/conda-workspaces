@@ -11,8 +11,6 @@ if TYPE_CHECKING:
 
 import conda_workspaces.env_spec as env_spec_mod
 from conda_workspaces.env_spec import (
-    LOCK_FILENAMES,
-    WORKSPACE_FILENAMES,
     CondaLockSpec,
     CondaWorkspaceSpec,
 )
@@ -46,19 +44,16 @@ def _patch_context(monkeypatch: pytest.MonkeyPatch) -> None:
         ("pixi.toml", '[workspace]\nname = "x"\n', False),
         ("conda.toml", '[project]\nname = "x"\n', False),
         ("conda.toml", "not valid toml [[[", False),
+        ("conda.toml", None, False),
     ],
 )
 def test_conda_workspace_spec_can_handle(
-    tmp_path: Path, filename: str, content: str, expected: bool
+    tmp_path: Path, filename: str, content: str | None, expected: bool
 ) -> None:
     path = tmp_path / filename
-    path.write_text(content, encoding="utf-8")
+    if content is not None:
+        path.write_text(content, encoding="utf-8")
     assert CondaWorkspaceSpec(path).can_handle() is expected
-
-
-def test_conda_workspace_spec_can_handle_missing_file(tmp_path: Path) -> None:
-    path = tmp_path / "conda.toml"
-    assert CondaWorkspaceSpec(path).can_handle() is False
 
 
 def test_conda_workspace_spec_env_returns_environment(tmp_path: Path) -> None:
@@ -131,19 +126,16 @@ def test_conda_workspace_spec_env_name_fallback_to_dirname(
         ("pixi.lock", "version: 1\n", False),
         ("conda.lock", "version: 5\n", False),
         ("conda.lock", "{{not yaml::", False),
+        ("conda.lock", None, False),
     ],
 )
 def test_conda_lock_spec_can_handle(
-    tmp_path: Path, filename: str, content: str, expected: bool
+    tmp_path: Path, filename: str, content: str | None, expected: bool
 ) -> None:
     path = tmp_path / filename
-    path.write_text(content, encoding="utf-8")
+    if content is not None:
+        path.write_text(content, encoding="utf-8")
     assert CondaLockSpec(path).can_handle() is expected
-
-
-def test_conda_lock_spec_can_handle_missing_file(tmp_path: Path) -> None:
-    path = tmp_path / "conda.lock"
-    assert CondaLockSpec(path).can_handle() is False
 
 
 def test_conda_lock_spec_can_handle_caches_result(tmp_path: Path) -> None:
@@ -268,11 +260,3 @@ def test_conda_lock_spec_env_wrong_version_raises(tmp_path: Path) -> None:
     spec._data_cache = {"version": 99, "environments": {}, "packages": []}
     with pytest.raises(ValueError, match="Unsupported lockfile version"):
         spec.env
-
-
-def test_workspace_filenames() -> None:
-    assert WORKSPACE_FILENAMES == {"conda.toml"}
-
-
-def test_lock_filenames() -> None:
-    assert LOCK_FILENAMES == {"conda.lock"}

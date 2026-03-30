@@ -13,8 +13,11 @@ resolution, and spec parsing.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import ClassVar
+from dataclasses import dataclass, field, fields
+from typing import TYPE_CHECKING, ClassVar
+
+if TYPE_CHECKING:
+    from typing import Any
 
 from conda.base.constants import KNOWN_SUBDIRS
 from conda.models.channel import Channel  # noqa: TC002
@@ -31,17 +34,34 @@ from .exceptions import (
 class PyPIDependency:
     """A PyPI dependency (PEP 508 string).
 
-    Stored separately from conda deps because they require a different
-    solver path (pip / uv integration via conda-pypi).
+    Names are translated to conda equivalents via ``conda-pypi``'s
+    grayskull mapping and merged into the same solver call as conda
+    deps.  Path/git/URL deps are handled post-solve via conda-pypi's
+    build system.
     """
 
     name: str
     spec: str = ""
+    extras: tuple[str, ...] = ()
+    path: str | None = None
+    editable: bool = False
+    git: str | None = None
+    url: str | None = None
 
     def __str__(self) -> str:
+        base = self.name
+        if self.extras:
+            base = f"{base}[{','.join(self.extras)}]"
+        if self.git:
+            return f"{base} @ git+{self.git}"
+        if self.path:
+            prefix = "-e " if self.editable else ""
+            return f"{prefix}{base} @ {self.path}"
+        if self.url:
+            return f"{base} @ {self.url}"
         if self.spec:
-            return f"{self.name}{self.spec}"
-        return self.name
+            return f"{base}{self.spec}"
+        return base
 
 
 @dataclass
@@ -88,21 +108,19 @@ class Environment:
     An environment inherits the ``default`` feature plus any additional
     features listed in *features*.
 
-    *solve_group* links environments so they share a single solver
-    solution (ensuring package-version consistency across environments).
-
     *no_default_feature* can be set to exclude the default feature,
     matching pixi's ``no-default-feature = true`` option.
     """
 
+    DEFAULT_NAME: ClassVar[str] = "default"
+
     name: str
     features: list[str] = field(default_factory=list)
-    solve_group: str | None = None
     no_default_feature: bool = False
 
     @property
     def is_default(self) -> bool:
-        return self.name == "default"
+        return self.name == self.DEFAULT_NAME
 
 
 @dataclass
@@ -150,8 +168,10 @@ class WorkspaceConfig:
         """
         if Feature.DEFAULT_NAME not in self.features:
             self.features[Feature.DEFAULT_NAME] = Feature(name=Feature.DEFAULT_NAME)
-        if "default" not in self.environments:
-            self.environments["default"] = Environment(name="default")
+        if Environment.DEFAULT_NAME not in self.environments:
+            self.environments[Environment.DEFAULT_NAME] = Environment(
+                name=Environment.DEFAULT_NAME
+            )
 
         invalid = [p for p in self.platforms if p not in KNOWN_SUBDIRS]
         if invalid:
@@ -233,3 +253,111 @@ class WorkspaceConfig:
                     seen.add(ch.canonical_name)
                     result.append(ch)
         return result
+
+
+@dataclass
+class TaskArg:
+    """A named argument that can be passed to a task."""
+
+    name: str
+    default: str | None = None
+    choices: list[str] | None = None
+
+    def to_toml(self) -> dict[str, object]:
+        """Serialize to a TOML-compatible dict."""
+        entry: dict[str, object] = {"arg": self.name}
+        if self.default is not None:
+            entry["default"] = self.default
+        if self.choices is not None:
+            entry["choices"] = self.choices
+        return entry
+
+
+@dataclass
+class TaskDependency:
+    """A reference to another task that must run first."""
+
+    task: str
+    args: list[str | dict[str, str]] = field(default_factory=list)
+    environment: str | None = None
+
+    def to_toml(self) -> str | dict[str, object]:
+        """Serialize to a TOML-compatible value (string or dict)."""
+        if self.args or self.environment:
+            entry: dict[str, object] = {"task": self.task}
+            if self.args:
+                entry["args"] = self.args
+            if self.environment:
+                entry["environment"] = self.environment
+            return entry
+        return self.task
+
+
+@dataclass
+class TaskOverride:
+    """Per-platform override for any task field.
+
+    Non-None fields replace the base task's values when the override
+    is merged into a Task via ``Task.resolve_for_platform``.
+    """
+
+    cmd: str | list[str] | None = None
+    args: list[TaskArg] | None = None
+    depends_on: list[TaskDependency] | None = None
+    cwd: str | None = None
+    env: dict[str, str] | None = None
+    inputs: list[str] | None = None
+    outputs: list[str] | None = None
+    clean_env: bool | None = None
+
+
+@dataclass
+class Task:
+    """A single task definition with all its configuration."""
+
+    name: str
+    cmd: str | list[str] | None = None
+    args: list[TaskArg] = field(default_factory=list)
+    depends_on: list[TaskDependency] = field(default_factory=list)
+    cwd: str | None = None
+    env: dict[str, str] = field(default_factory=dict)
+    description: str | None = None
+    inputs: list[str] = field(default_factory=list)
+    outputs: list[str] = field(default_factory=list)
+    clean_env: bool = False
+    default_environment: str | None = None
+    platforms: dict[str, TaskOverride] | None = None
+
+    @property
+    def is_alias(self) -> bool:
+        """True when the task is just a dependency grouping with no command."""
+        return self.cmd is None and bool(self.depends_on)
+
+    @property
+    def is_hidden(self) -> bool:
+        """Hidden tasks (prefixed with ``_``) are omitted from listings."""
+        return self.name.startswith("_")
+
+    def resolve_for_platform(self, subdir: str) -> Task:
+        """Return a copy of this task with platform overrides merged in.
+
+        *subdir* is a conda platform string such as ``linux-64`` or ``osx-arm64``.
+        If there is no matching override the task is returned unchanged.
+        """
+        if not self.platforms or subdir not in self.platforms:
+            return self
+
+        override = self.platforms[subdir]
+        kwargs: dict[str, Any] = {}
+        for f in fields(self):
+            if f.name in ("name", "platforms", "description", "default_environment"):
+                kwargs[f.name] = getattr(self, f.name)
+                continue
+            override_val = (
+                getattr(override, f.name, None) if hasattr(override, f.name) else None
+            )
+            if override_val is not None:
+                kwargs[f.name] = override_val
+            else:
+                kwargs[f.name] = getattr(self, f.name)
+        return Task(**kwargs)

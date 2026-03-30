@@ -3,9 +3,8 @@
 Reads workspace configuration from ``pyproject.toml``, trying these
 tables in order:
 
-1. ``[tool.conda.workspace]``          – preferred conda-native table
-2. ``[tool.conda-workspaces.workspace]`` – legacy conda-native table
-3. ``[tool.pixi.workspace]``            – pixi compatibility
+1. ``[tool.conda.workspace]``  – conda-native table
+2. ``[tool.pixi.workspace]``   – pixi compatibility
 """
 
 from __future__ import annotations
@@ -14,38 +13,29 @@ from typing import TYPE_CHECKING
 
 import tomlkit
 
-from ..exceptions import WorkspaceParseError
-from ..models import (
-    Environment,
-    Feature,
-    WorkspaceConfig,
-)
-from .base import WorkspaceParser
-from .toml import (
-    _parse_channels,
-    _parse_conda_deps,
-    _parse_environment,
-    _parse_pypi_deps,
-    _parse_target_overrides,
-)
+from ..exceptions import TaskParseError, WorkspaceParseError
+from ..models import WorkspaceConfig
+from .base import ManifestParser
+from .normalize import parse_feature_tasks, parse_tasks_and_targets
+from .toml import _parse_channels, _parse_features_and_envs
 
 if TYPE_CHECKING:
     from pathlib import Path
     from typing import Any
 
+    from ..models import Task
 
-class PyprojectTomlParser(WorkspaceParser):
-    """Parse workspace config from ``pyproject.toml``.
 
-    Tries these tables in order:
+class PyprojectTomlParser(ManifestParser):
+    """Parse workspace and task config from ``pyproject.toml``.
 
-    1. ``[tool.conda.workspace]`` – preferred conda-native table
-    2. ``[tool.conda-workspaces.workspace]`` – legacy table
-    3. ``[tool.pixi.workspace]`` – pixi compatibility
+    Tries these tool tables in priority order:
+
+    1. ``[tool.conda.*]`` – conda-native tables
+    2. ``[tool.pixi.*]`` – pixi compatibility
     """
 
     filenames = ("pyproject.toml",)
-    extensions = (".toml",)
 
     def can_handle(self, path: Path) -> bool:
         return path.name in self.filenames
@@ -59,11 +49,8 @@ class PyprojectTomlParser(WorkspaceParser):
             return False
         tool = data.get("tool", {})
         conda = tool.get("conda", {})
-        cw = tool.get("conda-workspaces", {})
         pixi = tool.get("pixi", {})
-        return bool(
-            conda.get("workspace") or cw.get("workspace") or pixi.get("workspace")
-        )
+        return bool(conda.get("workspace") or pixi.get("workspace"))
 
     def parse(self, path: Path) -> WorkspaceConfig:
         try:
@@ -75,23 +62,18 @@ class PyprojectTomlParser(WorkspaceParser):
         tool = data.get("tool", {})
         root = str(path.parent)
 
-        # Try tables in priority order: conda > conda-workspaces > pixi
         conda = tool.get("conda", {})
-        cw = tool.get("conda-workspaces", {})
         pixi = tool.get("pixi", {})
 
         source: dict[str, Any]
         if conda.get("workspace"):
             source = conda
-        elif cw.get("workspace"):
-            source = cw
         elif pixi.get("workspace"):
             source = pixi
         else:
             raise WorkspaceParseError(
                 path,
-                "No [tool.conda.workspace], [tool.conda-workspaces.workspace], "
-                "or [tool.pixi.workspace] table found",
+                "No [tool.conda.workspace] or [tool.pixi.workspace] table found",
             )
 
         ws = source.get("workspace", {})
@@ -107,55 +89,30 @@ class PyprojectTomlParser(WorkspaceParser):
             channel_priority=ws.get("channel-priority"),
         )
 
-        default_feature = Feature(name=Feature.DEFAULT_NAME)
-        default_feature.conda_dependencies = _parse_conda_deps(
-            source.get("dependencies", {})
-        )
-        default_feature.pypi_dependencies = _parse_pypi_deps(
-            source.get("pypi-dependencies", {})
-        )
-
-        activation = source.get("activation", {})
-        if activation:
-            default_feature.activation_scripts = list(activation.get("scripts", []))
-            default_feature.activation_env = dict(activation.get("env", {}))
-
-        sysreq = source.get("system-requirements", {})
-        if sysreq:
-            default_feature.system_requirements = {k: str(v) for k, v in sysreq.items()}
-
-        _parse_target_overrides(source.get("target", {}), default_feature)
-        config.features[Feature.DEFAULT_NAME] = default_feature
-
-        for feat_name, feat_data in source.get("feature", {}).items():
-            feature = Feature(name=feat_name)
-            feature.conda_dependencies = _parse_conda_deps(
-                feat_data.get("dependencies", {})
-            )
-            feature.pypi_dependencies = _parse_pypi_deps(
-                feat_data.get("pypi-dependencies", {})
-            )
-            feature.channels = _parse_channels(feat_data.get("channels", []))
-            feature.platforms = list(feat_data.get("platforms", []))
-
-            sysreq = feat_data.get("system-requirements", {})
-            if sysreq:
-                feature.system_requirements = {k: str(v) for k, v in sysreq.items()}
-
-            activation = feat_data.get("activation", {})
-            if activation:
-                feature.activation_scripts = list(activation.get("scripts", []))
-                feature.activation_env = dict(activation.get("env", {}))
-
-            _parse_target_overrides(feat_data.get("target", {}), feature)
-            config.features[feat_name] = feature
-
-        envs_data = source.get("environments", {})
-        if envs_data:
-            for env_name, env_val in envs_data.items():
-                env = _parse_environment(env_name, env_val)
-                config.environments[env_name] = env
-        else:
-            config.environments["default"] = Environment(name="default")
-
+        _parse_features_and_envs(source, config, path)
         return config
+
+    def has_tasks(self, path: Path) -> bool:
+        if not path.exists():
+            return False
+        try:
+            data = tomlkit.loads(path.read_text(encoding="utf-8")).unwrap()
+        except Exception:
+            return False
+        tool = data.get("tool", {})
+        return bool(
+            tool.get("conda", {}).get("tasks") or tool.get("pixi", {}).get("tasks")
+        )
+
+    def parse_tasks(self, path: Path) -> dict[str, Task]:
+        try:
+            data = tomlkit.loads(path.read_text(encoding="utf-8")).unwrap()
+        except Exception as exc:
+            raise TaskParseError(str(path), str(exc)) from exc
+
+        tool = data.get("tool", {})
+        source = tool.get("conda", {}) or tool.get("pixi", {})
+
+        tasks = parse_tasks_and_targets(source)
+        parse_feature_tasks(source, tasks)
+        return tasks

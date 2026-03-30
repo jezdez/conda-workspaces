@@ -11,30 +11,22 @@ from typing import TYPE_CHECKING
 
 import tomlkit
 
-from ..exceptions import WorkspaceParseError
-from ..models import (
-    Environment,
-    Feature,
-    WorkspaceConfig,
-)
-from .base import WorkspaceParser
-from .toml import (
-    _parse_channels,
-    _parse_conda_deps,
-    _parse_environment,
-    _parse_pypi_deps,
-    _parse_target_overrides,
-)
+from ..exceptions import TaskParseError, WorkspaceParseError
+from ..models import WorkspaceConfig
+from .base import ManifestParser
+from .normalize import parse_feature_tasks, parse_tasks_and_targets
+from .toml import _parse_channels, _parse_features_and_envs
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from ..models import Task
 
-class PixiTomlParser(WorkspaceParser):
-    """Parse ``pixi.toml`` workspace manifests."""
+
+class PixiTomlParser(ManifestParser):
+    """Parse ``pixi.toml`` manifests (workspace and tasks)."""
 
     filenames = ("pixi.toml",)
-    extensions = (".toml",)
 
     def can_handle(self, path: Path) -> bool:
         return path.name in self.filenames
@@ -73,61 +65,24 @@ class PixiTomlParser(WorkspaceParser):
             channel_priority=ws.get("channel-priority"),
         )
 
-        default_feature = Feature(name=Feature.DEFAULT_NAME)
-        default_feature.conda_dependencies = _parse_conda_deps(
-            data.get("dependencies", {})
-        )
-        default_feature.pypi_dependencies = _parse_pypi_deps(
-            data.get("pypi-dependencies", {})
-        )
-
-        # Top-level activation
-        activation = data.get("activation", {})
-        if activation:
-            default_feature.activation_scripts = list(activation.get("scripts", []))
-            default_feature.activation_env = dict(activation.get("env", {}))
-
-        # Top-level system-requirements
-        sysreq = data.get("system-requirements", {})
-        if sysreq:
-            default_feature.system_requirements = {k: str(v) for k, v in sysreq.items()}
-
-        # Top-level target overrides
-        _parse_target_overrides(data.get("target", {}), default_feature)
-
-        config.features[Feature.DEFAULT_NAME] = default_feature
-
-        for feat_name, feat_data in data.get("feature", {}).items():
-            feature = Feature(name=feat_name)
-            feature.conda_dependencies = _parse_conda_deps(
-                feat_data.get("dependencies", {})
-            )
-            feature.pypi_dependencies = _parse_pypi_deps(
-                feat_data.get("pypi-dependencies", {})
-            )
-            feature.channels = _parse_channels(feat_data.get("channels", []))
-            feature.platforms = list(feat_data.get("platforms", []))
-
-            sysreq = feat_data.get("system-requirements", {})
-            if sysreq:
-                feature.system_requirements = {k: str(v) for k, v in sysreq.items()}
-
-            activation = feat_data.get("activation", {})
-            if activation:
-                feature.activation_scripts = list(activation.get("scripts", []))
-                feature.activation_env = dict(activation.get("env", {}))
-
-            _parse_target_overrides(feat_data.get("target", {}), feature)
-
-            config.features[feat_name] = feature
-
-        envs_data = data.get("environments", {})
-        if envs_data:
-            for env_name, env_val in envs_data.items():
-                env = _parse_environment(env_name, env_val)
-                config.environments[env_name] = env
-        else:
-            # If no explicit environments, create a default one
-            config.environments["default"] = Environment(name="default")
-
+        _parse_features_and_envs(data, config, path)
         return config
+
+    def has_tasks(self, path: Path) -> bool:
+        if not path.exists():
+            return False
+        try:
+            data = tomlkit.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return False
+        return bool(data.get("tasks"))
+
+    def parse_tasks(self, path: Path) -> dict[str, Task]:
+        try:
+            data = tomlkit.loads(path.read_text(encoding="utf-8")).unwrap()
+        except Exception as exc:
+            raise TaskParseError(str(path), str(exc)) from exc
+
+        tasks = parse_tasks_and_targets(data)
+        parse_feature_tasks(data, tasks)
+        return tasks

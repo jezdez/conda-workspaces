@@ -3,25 +3,10 @@
 from __future__ import annotations
 
 from conda_workspaces.env_export import (
-    ALIASES,
-    DEFAULT_FILENAMES,
-    FORMAT,
     _envs_to_dict,
     multiplatform_export,
 )
 from conda_workspaces.lockfile import LOCKFILE_VERSION
-
-
-def test_format_name() -> None:
-    assert FORMAT == "conda-workspaces-lock"
-
-
-def test_aliases() -> None:
-    assert ALIASES == ("workspace-lock",)
-
-
-def test_default_filenames() -> None:
-    assert DEFAULT_FILENAMES == ("conda.lock",)
 
 
 class FakeRecord:

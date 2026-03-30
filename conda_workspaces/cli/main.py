@@ -1,4 +1,7 @@
-"""CLI for ``conda workspace`` -- argparse configuration and dispatch."""
+"""CLI for ``conda workspace`` and ``conda task``.
+
+Argparse configuration and dispatch for both subcommands.
+"""
 
 from __future__ import annotations
 
@@ -8,22 +11,42 @@ from pathlib import Path
 from conda.cli.helpers import (
     add_output_and_prompt_options,
     add_parser_help,
-    add_parser_prefix,
 )
+from conda.exceptions import CondaError, CondaSystemExit, DryRunExit
 
 
-def generate_parser() -> argparse.ArgumentParser:
-    """Build and return the parser -- used by sphinxarg.ext for docs."""
+def _handle_error(exc: CondaError) -> int:
+    """Render a CondaError with Rich and return its exit code.
+
+    In JSON or debug mode, re-raises so conda's own handler takes over
+    (preserving tracebacks and structured JSON output).
+    """
+    from conda.base.context import context as conda_context
+
+    if conda_context.json or conda_context.debug:
+        raise exc
+
+    from rich.console import Console
+
+    from . import status
+
+    console = Console(stderr=True, highlight=False)
+    status.print_error(console, exc)
+    return getattr(exc, "return_code", 1)
+
+
+def generate_workspace_parser() -> argparse.ArgumentParser:
+    """Build and return the workspace parser — used by sphinxarg.ext for docs."""
     parser = argparse.ArgumentParser(
         prog="conda workspace",
         description="Manage project-scoped multi-environment workspaces.",
         add_help=False,
     )
-    configure_parser(parser)
+    configure_workspace_parser(parser)
     return parser
 
 
-def configure_parser(parser: argparse.ArgumentParser) -> None:
+def configure_workspace_parser(parser: argparse.ArgumentParser) -> None:
     """Set up ``conda workspace`` CLI with subcommands."""
     add_parser_help(parser)
 
@@ -46,9 +69,9 @@ def configure_parser(parser: argparse.ArgumentParser) -> None:
     init_parser.add_argument(
         "--format",
         choices=["pixi", "conda", "pyproject"],
-        default="pixi",
+        default="conda",
         dest="manifest_format",
-        help="Manifest format to generate (default: pixi).",
+        help="Manifest format to generate (default: conda).",
     )
     init_parser.add_argument(
         "--name",
@@ -94,48 +117,69 @@ def configure_parser(parser: argparse.ArgumentParser) -> None:
         "--locked",
         action="store_true",
         default=False,
-        help="Install from existing lockfiles (skip solving).",
+        help="Install from lockfiles, verifying they are up-to-date.",
+    )
+    install_parser.add_argument(
+        "--frozen",
+        action="store_true",
+        default=False,
+        help="Install from existing lockfiles without checking freshness.",
     )
 
     lock_parser = sub.add_parser(
         "lock",
-        help="Generate lockfiles for installed environments.",
+        help="Solve and generate lockfiles for workspace environments.",
         add_help=False,
     )
     add_parser_help(lock_parser)
+    add_output_and_prompt_options(lock_parser)
     lock_parser.add_argument(
         "-e",
         "--environment",
         default=None,
-        help="Generate lockfile for this environment only (default: all installed).",
+        help="Generate lockfile for this environment only (default: all).",
     )
 
     list_parser = sub.add_parser(
         "list",
-        help="List environments defined in the workspace.",
+        help="List packages in a workspace environment.",
         add_help=False,
     )
     add_parser_help(list_parser)
     add_output_and_prompt_options(list_parser)
     list_parser.add_argument(
+        "-e",
+        "--environment",
+        default="default",
+        help="Environment to list packages for (default: default).",
+    )
+
+    envs_parser = sub.add_parser(
+        "envs",
+        help="List environments defined in the workspace.",
+        add_help=False,
+    )
+    add_parser_help(envs_parser)
+    add_output_and_prompt_options(envs_parser)
+    envs_parser.add_argument(
         "--installed",
         action="store_true",
         default=False,
-        help="Only show environments that are currently installed.",
+        help="Only show installed environments.",
     )
 
     info_parser = sub.add_parser(
         "info",
-        help="Show details about an environment.",
+        help="Show workspace overview or environment details.",
         add_help=False,
     )
     add_parser_help(info_parser)
     add_output_and_prompt_options(info_parser)
     info_parser.add_argument(
-        "env_name",
-        nargs="?",
-        default="default",
-        help="Environment name (default: default).",
+        "-e",
+        "--environment",
+        default=None,
+        help="Show details for this environment (default: workspace overview).",
     )
 
     add_parser_cmd = sub.add_parser(
@@ -148,7 +192,7 @@ def configure_parser(parser: argparse.ArgumentParser) -> None:
     add_parser_cmd.add_argument(
         "specs",
         nargs="+",
-        help="Package specs to add (e.g. 'numpy >=1.24').",
+        help="Package specs to add (e.g. 'numpy>=1.24').",
     )
     add_parser_cmd.add_argument(
         "-e",
@@ -212,25 +256,6 @@ def configure_parser(parser: argparse.ArgumentParser) -> None:
         help="Remove only this environment (default: all).",
     )
 
-    run_parser = sub.add_parser(
-        "run",
-        help="Run a command in a workspace environment.",
-        add_help=False,
-    )
-    add_parser_help(run_parser)
-    add_parser_prefix(run_parser)
-    run_parser.add_argument(
-        "-e",
-        "--environment",
-        default="default",
-        help="Environment to run in (default: default).",
-    )
-    run_parser.add_argument(
-        "cmd",
-        nargs=argparse.REMAINDER,
-        help="Command to execute in the environment.",
-    )
-
     activate_parser = sub.add_parser(
         "activate",
         help="Print activation instructions for an environment.",
@@ -238,10 +263,28 @@ def configure_parser(parser: argparse.ArgumentParser) -> None:
     )
     add_parser_help(activate_parser)
     activate_parser.add_argument(
-        "env_name",
-        nargs="?",
+        "-e",
+        "--environment",
         default="default",
         help="Environment name (default: default).",
+    )
+
+    run_parser = sub.add_parser(
+        "run",
+        help="Run a command in a workspace environment.",
+        add_help=False,
+    )
+    add_parser_help(run_parser)
+    run_parser.add_argument(
+        "-e",
+        "--environment",
+        default="default",
+        help="Environment name (default: default).",
+    )
+    run_parser.add_argument(
+        "cmd",
+        nargs=argparse.REMAINDER,
+        help="Command to run (use -- to separate from options).",
     )
 
     shell_parser = sub.add_parser(
@@ -251,8 +294,8 @@ def configure_parser(parser: argparse.ArgumentParser) -> None:
     )
     add_parser_help(shell_parser)
     shell_parser.add_argument(
-        "env_name",
-        nargs="?",
+        "-e",
+        "--environment",
         default="default",
         help="Environment name (default: default).",
     )
@@ -263,58 +306,229 @@ def configure_parser(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def execute(args: argparse.Namespace) -> int:
-    """Main entry point dispatched by the conda plugin system."""
+def execute_workspace(args: argparse.Namespace) -> int:
+    """Main entry point for ``conda workspace``."""
     subcmd = args.subcmd
 
     if subcmd is None:
-        generate_parser().print_help()
+        generate_workspace_parser().print_help()
         return 0
 
+    try:
+        return _dispatch_workspace(args, subcmd)
+    except (CondaSystemExit, DryRunExit):
+        raise
+    except CondaError as exc:
+        return _handle_error(exc)
+
+
+def _dispatch_workspace(args: argparse.Namespace, subcmd: str) -> int:
     if subcmd == "init":
-        from .init import execute_init
+        from .workspace.init import execute_init
 
         return execute_init(args)
     elif subcmd == "install":
-        from .install import execute_install
+        from .workspace.install import execute_install
 
         return execute_install(args)
     elif subcmd == "lock":
-        from .lock import execute_lock
+        from .workspace.lock import execute_lock
 
         return execute_lock(args)
     elif subcmd == "list":
-        from .list import execute_list
+        from .workspace.list import execute_list
 
         return execute_list(args)
+    elif subcmd == "envs":
+        from .workspace.list import execute_list
+
+        args.envs = True
+        return execute_list(args)
     elif subcmd == "info":
-        from .info import execute_info
+        from .workspace.info import execute_info
 
         return execute_info(args)
     elif subcmd == "add":
-        from .add import execute_add
+        from .workspace.add import execute_add
 
         return execute_add(args)
     elif subcmd == "remove":
-        from .remove import execute_remove
+        from .workspace.remove import execute_remove
 
         return execute_remove(args)
     elif subcmd == "clean":
-        from .clean import execute_clean
+        from .workspace.clean import execute_clean
 
         return execute_clean(args)
-    elif subcmd == "run":
-        from .run import execute_run
-
-        return execute_run(args)
     elif subcmd == "activate":
-        from .activate import execute_activate
+        from .workspace.activate import execute_activate
 
         return execute_activate(args)
+    elif subcmd == "run":
+        from .workspace.run import execute_run
+
+        return execute_run(args)
     elif subcmd == "shell":
-        from .shell import execute_shell
+        from .workspace.shell import execute_shell
 
         return execute_shell(args)
     else:
-        generate_parser().print_help()
+        generate_workspace_parser().print_help()
+        return 0
+
+
+def generate_task_parser() -> argparse.ArgumentParser:
+    """Build and return the task parser — used by sphinxarg.ext for docs."""
+    parser = argparse.ArgumentParser(
+        prog="conda task",
+        description="Run, list, and manage project tasks.",
+        add_help=False,
+    )
+    configure_task_parser(parser)
+    return parser
+
+
+def configure_task_parser(parser: argparse.ArgumentParser) -> None:
+    """Set up ``conda task`` CLI with subcommands."""
+    add_parser_help(parser)
+
+    parser.add_argument(
+        "--file",
+        "-f",
+        type=Path,
+        default=None,
+        help="Path to a specific task file instead of auto-detection.",
+    )
+
+    sub = parser.add_subparsers(dest="subcmd")
+
+    run_parser = sub.add_parser("run", help="Run a task.", add_help=False)
+    add_parser_help(run_parser)
+    add_output_and_prompt_options(run_parser)
+    run_parser.add_argument(
+        "-e",
+        "--environment",
+        default=None,
+        help="Workspace environment to run in.",
+    )
+    run_parser.add_argument("task_name", help="Name of the task to run.")
+    run_parser.add_argument(
+        "task_args",
+        nargs="*",
+        default=[],
+        help="Arguments to pass to the task.",
+    )
+    run_parser.add_argument(
+        "--clean-env",
+        action="store_true",
+        default=False,
+        help="Run in a clean environment (minimal env vars).",
+    )
+    run_parser.add_argument(
+        "--skip-deps",
+        action="store_true",
+        default=False,
+        help="Skip dependency tasks, run only the named task.",
+    )
+    run_parser.add_argument(
+        "--cwd",
+        type=Path,
+        default=None,
+        help="Override the working directory for the task.",
+    )
+    run_parser.add_argument(
+        "--templated",
+        action="store_true",
+        default=False,
+        help="Treat the command as a Jinja2 template (for ad-hoc commands).",
+    )
+
+    list_parser = sub.add_parser("list", help="List available tasks.", add_help=False)
+    add_parser_help(list_parser)
+    add_output_and_prompt_options(list_parser)
+
+    add_task_parser = sub.add_parser(
+        "add", help="Add a task to the manifest.", add_help=False
+    )
+    add_parser_help(add_task_parser)
+    add_output_and_prompt_options(add_task_parser)
+    add_task_parser.add_argument("task_name", help="Name for the new task.")
+    add_task_parser.add_argument("cmd", help="Command string for the task.")
+    add_task_parser.add_argument(
+        "--depends-on",
+        nargs="*",
+        default=[],
+        help="Tasks this task depends on.",
+    )
+    add_task_parser.add_argument(
+        "--description",
+        default=None,
+        help="Human-readable description.",
+    )
+
+    rm_parser = sub.add_parser(
+        "remove", help="Remove a task from the manifest.", add_help=False
+    )
+    add_parser_help(rm_parser)
+    add_output_and_prompt_options(rm_parser)
+    rm_parser.add_argument("task_name", help="Name of the task to remove.")
+
+    export_parser = sub.add_parser(
+        "export",
+        help="Export tasks to conda.toml format.",
+        add_help=False,
+    )
+    add_parser_help(export_parser)
+    add_output_and_prompt_options(export_parser)
+    export_parser.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        default=None,
+        help="Write to a file instead of stdout.",
+    )
+
+
+def execute_task(args: argparse.Namespace) -> int:
+    """Main entry point for ``conda task``."""
+    subcmd = args.subcmd
+
+    if subcmd is None:
+        if hasattr(args, "task_name") and args.task_name:
+            subcmd = "run"
+        else:
+            generate_task_parser().print_help()
+            return 0
+
+    try:
+        return _dispatch_task(args, subcmd)
+    except (CondaSystemExit, DryRunExit):
+        raise
+    except CondaError as exc:
+        return _handle_error(exc)
+
+
+def _dispatch_task(args: argparse.Namespace, subcmd: str) -> int:
+    if subcmd == "run":
+        from .task.run import execute_run
+
+        return execute_run(args)
+    elif subcmd == "list":
+        from .task.list import execute_list
+
+        return execute_list(args)
+    elif subcmd == "add":
+        from .task.add import execute_add
+
+        return execute_add(args)
+    elif subcmd == "remove":
+        from .task.remove import execute_remove
+
+        return execute_remove(args)
+    elif subcmd == "export":
+        from .task.export import execute_export
+
+        return execute_export(args)
+    else:
+        generate_task_parser().print_help()
         return 0

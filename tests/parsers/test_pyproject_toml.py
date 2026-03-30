@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from conda_workspaces.exceptions import WorkspaceParseError
 from conda_workspaces.parsers.pyproject_toml import PyprojectTomlParser
 
 
@@ -73,16 +74,14 @@ def test_parse_environments(parser, sample_pyproject_toml):
     assert "test" in config.environments
     test_env = config.environments["test"]
     assert test_env.features == ["test"]
-    assert test_env.solve_group == "default"
 
 
 @pytest.mark.parametrize(
     "table_key, dep_key",
     [
         ("tool.conda", "tool.conda"),
-        ("tool.conda-workspaces", "tool.conda-workspaces"),
     ],
-    ids=["conda-table", "conda-workspaces-table"],
+    ids=["conda-table"],
 )
 def test_alternative_tables(parser, tmp_path, table_key, dep_key):
     content = f"""\
@@ -115,8 +114,6 @@ python = ">=3.12"
 )
 def test_parse_error(parser, tmp_path, content):
     """Missing workspace or malformed TOML raises WorkspaceParseError."""
-    from conda_workspaces.exceptions import WorkspaceParseError
-
     path = tmp_path / "pyproject.toml"
     path.write_text(content, encoding="utf-8")
     with pytest.raises(WorkspaceParseError):
@@ -150,9 +147,6 @@ python = ">=3.10"
     # Should use conda table (>=3.12), not pixi (>=3.10)
     default = config.features["default"]
     assert str(default.conda_dependencies["python"].version) == ">=3.12"
-
-
-
 
 
 def test_parse_activation(parser, tmp_path):

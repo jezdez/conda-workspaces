@@ -22,9 +22,35 @@ pixi global install conda-workspaces
 
 ::::
 
+## Your first tasks
+
+![task quickstart demo](../demos/task-quickstart.gif)
+
+Create a `conda.toml` in your project root:
+
+```toml
+[tasks]
+hello = "echo 'Hello from conda-workspaces!'"
+test = { cmd = "pytest tests/ -v", depends-on = ["build"] }
+build = "python -m build"
+```
+
+Run a task:
+
+```bash
+conda task run hello
+conda task run test    # runs build first, then test
+conda task list        # see all tasks
+```
+
+Tasks run in your current conda environment. No workspace definition is
+required — you can start with tasks alone and add workspace features later.
+
 ## Your first workspace
 
-Create a manifest in your project root:
+![quickstart demo](../demos/quickstart.gif)
+
+Add workspace configuration to the same `conda.toml`:
 
 ::::{tab-set}
 
@@ -45,8 +71,8 @@ pytest = ">=8.0"
 pytest-cov = ">=4.0"
 
 [environments]
-default = { solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
+default = []
+test = { features = ["test"] }
 ```
 
 :::
@@ -68,8 +94,8 @@ pytest = ">=8.0"
 pytest-cov = ">=4.0"
 
 [environments]
-default = { solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
+default = []
+test = { features = ["test"] }
 ```
 
 :::
@@ -91,8 +117,8 @@ pytest = ">=8.0"
 pytest-cov = ">=4.0"
 
 [tool.conda.environments]
-default = { solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
+default = []
+test = { features = ["test"] }
 ```
 
 :::
@@ -117,53 +143,101 @@ This creates project-local conda environments under `.conda/envs/` for
 each environment defined in your manifest. A `conda.lock` file is
 generated automatically after solving.
 
+You can point to a specific manifest with `--file` / `-f`:
+
+```bash
+cw install -f path/to/conda.toml
+```
+
+To recreate environments from scratch, use `--force-reinstall`:
+
+```bash
+cw install --force-reinstall
+```
+
+## Lock
+
+![lockfile demo](../demos/lockfile.gif)
+
+The `cw lock` command runs the solver and records the solution in
+`conda.lock` without installing any environments:
+
+```bash
+cw lock
+```
+
 ## Reproducible installs
 
-To install from the lockfile without re-solving:
+Use `--locked` to install from the lockfile. This validates that the
+lockfile is still fresh relative to the manifest — if the manifest has
+changed, the install fails:
 
 ```bash
 cw install --locked
 ```
 
-This uses the exact package URLs recorded in `conda.lock`, ensuring
-identical environments across machines and CI.
-
-## Run commands
+Use `--frozen` to install from the lockfile as-is, without checking
+freshness:
 
 ```bash
-cw run -e test -- pytest -v
+cw install --frozen
 ```
 
-## Spawn a shell
+## Run in workspace environments
 
-To drop into an interactive shell with an environment activated, use
-`cw shell`. This relies on [conda-spawn](https://conda-incubator.github.io/conda-spawn/)
-to start a new shell process — exit with `exit` or Ctrl+D to return.
+Once your workspace is installed, run tasks in specific environments:
 
 ```bash
-cw shell test
+conda task run -e test pytest -v
 ```
 
-You can also pass a command to run inside the spawned shell:
+Run a one-shot command in an environment:
 
 ```bash
-cw shell test -- python -c "import numpy; print(numpy.__version__)"
+cw run -e test -- python -c "import numpy; print(numpy.__version__)"
 ```
 
-## List environments
+Or spawn an interactive shell:
 
 ```bash
-cw list
+cw shell -e test
 ```
 
-## View environment details
+## Add dependencies
 
 ```bash
-cw info test
+cw add numpy
+```
+
+Add to a specific feature:
+
+```bash
+cw add --feature test pytest
+```
+
+Add a PyPI dependency:
+
+```bash
+cw add --pypi requests
+```
+
+## List packages and environments
+
+```bash
+cw list              # packages in default env
+cw list -e test      # packages in test env
+cw envs              # list defined environments
+```
+
+## Workspace overview
+
+```bash
+cw info
+cw info -e test      # details for a specific environment
 ```
 
 ## Next steps
 
-- Read about [features](features.md) to learn how environments compose
+- Read about [features](features.md) to learn how environments and tasks work
 - See the [configuration](configuration.md) reference for all manifest options
 - Check out the [tutorials](tutorials/index.md) for more in-depth guides

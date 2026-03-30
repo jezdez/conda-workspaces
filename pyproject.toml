@@ -25,10 +25,16 @@ dependencies = [
   # "conda >=24.7",
   # conda-lockfiles provides rattler-lock v6 parsing and record helpers
   # "conda-lockfiles >=0.1",
+  # conda-rattler-solver provides the rattler solver backend
+  # "conda-rattler-solver >=0.0.6",
+  # conda-pypi provides PyPI wheel extraction and name mapping
+  # "conda-pypi >=0.5.0",
   # conda-spawn provides shell spawning for `cw shell`
   # "conda-spawn >=0.0.5",
+  "rich >=13.0",
   "tomlkit >=0.13",
   "platformdirs >=3.0",
+  "jinja2 >=3.0",
 ]
 dynamic = ["version"]
 
@@ -44,6 +50,7 @@ version-file = "conda_workspaces/_version.py"
 
 [project.scripts]
 cw = "conda_workspaces.__main__:main"
+ct = "conda_workspaces.__main__:main_task"
 
 [project.entry-points.conda]
 "conda-workspaces" = "conda_workspaces.plugin"
@@ -78,9 +85,13 @@ select = [
   "W",    # pycodestyle warnings
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/conftest.py" = ["E402"]  # pytest_plugins must precede imports
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra -v"
+markers = ["integration: end-to-end workflow tests"]
 
 [tool.ty.environment]
 python-version = "3.10"
@@ -93,6 +104,8 @@ platforms = ["linux-64", "osx-64", "osx-arm64", "win-64", "linux-aarch64"]
 python = ">=3.10"
 conda = ">=24.7"
 conda-lockfiles = ">=0.1"
+conda-pypi = ">=0.5.0"
+conda-rattler-solver = ">=0.0.6"
 conda-spawn = ">=0.0.5"
 
 [tool.pixi.pypi-dependencies]
@@ -125,10 +138,19 @@ test = {features = ["test"], solve-group = "default"}
 docs = {features = ["docs"], solve-group = "default"}
 
 [tool.pixi.tasks]
-lint = "ruff check conda_workspaces tests"
-format = "ruff format conda_workspaces tests"
-format-check = "ruff format --check conda_workspaces tests"
-typecheck = "ty check conda_workspaces"
-test = "pytest"
-test-cov = "pytest --cov --cov-report=term-missing --cov-report=html"
-docs = "sphinx-build -b dirhtml docs docs/_build/dirhtml"
+lint = { cmd = "ruff check conda_workspaces tests", description = "Check code style" }
+format = { cmd = "ruff format conda_workspaces tests", description = "Auto-format code" }
+format-check = { cmd = "ruff format --check conda_workspaces tests", description = "Verify formatting" }
+typecheck = { cmd = "ty check conda_workspaces", description = "Run type checker" }
+test = { cmd = "pytest", description = "Run test suite" }
+test-cov = { cmd = "pytest --cov --cov-report=term-missing --cov-report=html", description = "Tests with coverage" }
+docs = { cmd = "sphinx-build -b dirhtml docs docs/_build/dirhtml", description = "Build documentation" }
+
+[tool.pixi.tasks.check]
+depends-on = ["lint", "format-check", "typecheck"]
+description = "Run all checks"
+
+[tool.pixi.tasks.demos]
+cmd = """bash -c 'if [ -n "$1" ]; then vhs "demos/$1.tape"; else for tape in demos/*.tape; do [[ "$(basename "$tape")" == _* ]] && continue; vhs "$tape"; done; fi' -- {{ name }}"""
+args = [{ arg = "name", default = "" }]
+description = "Record demo GIFs"

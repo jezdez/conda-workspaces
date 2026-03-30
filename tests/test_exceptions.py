@@ -5,10 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from conda.exceptions import CondaError
 
 from conda_workspaces.exceptions import (
     ActivationError,
-    ChannelError,
     CondaWorkspacesError,
     EnvironmentNotFoundError,
     EnvironmentNotInstalledError,
@@ -54,10 +54,6 @@ from conda_workspaces.exceptions import (
             ["test"],
         ),
         (
-            ChannelError("bad channel config"),
-            ["bad channel config"],
-        ),
-        (
             ActivationError("dev", "shell not found"),
             ["dev", "shell not found"],
         ),
@@ -82,7 +78,6 @@ from conda_workspaces.exceptions import (
         "feature-not-found",
         "platform-error",
         "solve-error",
-        "channel-error",
         "activation-error",
         "lockfile-not-found",
         "env-not-installed",
@@ -96,8 +91,6 @@ def test_exception_message(exc, expected_fragments):
 
 
 def test_inheritance():
-    from conda.exceptions import CondaError
-
     assert issubclass(CondaWorkspacesError, CondaError)
 
 
@@ -111,3 +104,39 @@ def test_inheritance():
 )
 def test_exception_attributes(exc, attr, expected):
     assert getattr(exc, attr) == expected
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [
+        WorkspaceNotFoundError("/some/dir"),
+        WorkspaceParseError("/path/pixi.toml", "bad syntax"),
+        EnvironmentNotFoundError("dev", ["default", "test"]),
+        EnvironmentNotInstalledError("dev"),
+        ManifestExistsError("pixi.toml"),
+        FeatureNotFoundError("gpu", "train"),
+        PlatformError("win-arm64", ["linux-64", "osx-arm64"]),
+        SolveError("test", "conflict"),
+        ActivationError("dev", "shell not found"),
+        LockfileNotFoundError("test", Path("conda.lock")),
+    ],
+    ids=[
+        "workspace-not-found",
+        "parse-error",
+        "env-not-found",
+        "env-not-installed",
+        "manifest-exists",
+        "feature-not-found",
+        "platform-error",
+        "solve-error",
+        "activation-error",
+        "lockfile-not-found",
+    ],
+)
+def test_error_message_and_hints_separate(exc):
+    """error_message and hints are stored separately from str(exc)."""
+    assert exc.error_message
+    assert exc.error_message in str(exc)
+    for hint in exc.hints:
+        assert hint in str(exc)
+    assert exc.error_message != str(exc) or not exc.hints

@@ -7,18 +7,19 @@ import pytest
 from conda_workspaces.plugin import (
     conda_environment_exporters,
     conda_environment_specifiers,
+    conda_pre_commands,
     conda_subcommands,
 )
 
 
-def test_conda_subcommands_yields_workspace() -> None:
-    items = list(conda_subcommands())
-    assert len(items) == 1
-    sub = items[0]
-    assert sub.name == "workspace"
-    assert sub.summary
-    assert callable(sub.action)
-    assert callable(sub.configure_parser)
+def test_conda_subcommands_yields_workspace_and_task() -> None:
+    items = {sub.name: sub for sub in conda_subcommands()}
+    assert "workspace" in items
+    assert "task" in items
+    for sub in items.values():
+        assert sub.summary
+        assert callable(sub.action)
+        assert callable(sub.configure_parser)
 
 
 @pytest.mark.parametrize(
@@ -34,10 +35,6 @@ def test_conda_environment_specifiers(name: str, expected_cls_name: str) -> None
     assert items[name].environment_spec.__name__ == expected_cls_name
 
 
-def test_conda_environment_specifiers_count() -> None:
-    assert len(list(conda_environment_specifiers())) == 2
-
-
 def test_conda_environment_exporters_yields_one() -> None:
     items = list(conda_environment_exporters())
     assert len(items) == 1
@@ -46,3 +43,12 @@ def test_conda_environment_exporters_yields_one() -> None:
     assert exp.aliases == ("workspace-lock",)
     assert exp.default_filenames == ("conda.lock",)
     assert callable(exp.multiplatform_export)
+
+
+def test_conda_pre_commands_yields_install_hint() -> None:
+    items = list(conda_pre_commands())
+    assert len(items) == 1
+    hook = items[0]
+    assert hook.name == "conda-workspaces-install-hint"
+    assert "install" in hook.run_for
+    assert callable(hook.action)

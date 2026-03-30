@@ -6,10 +6,16 @@ from pathlib import Path
 
 import pytest
 
-from conda_workspaces.exceptions import WorkspaceNotFoundError, WorkspaceParseError
+from conda_workspaces.exceptions import (
+    NoTaskFileError,
+    WorkspaceNotFoundError,
+    WorkspaceParseError,
+)
 from conda_workspaces.parsers import (
     _cached_parse,
     detect_and_parse,
+    detect_and_parse_tasks,
+    detect_task_file,
     detect_workspace_file,
     find_parser,
 )
@@ -127,3 +133,69 @@ def test_detect_skips_file_without_workspace(tmp_path):
     path.write_text('[dependencies]\npython = ">=3.10"\n', encoding="utf-8")
     with pytest.raises(WorkspaceNotFoundError):
         detect_workspace_file(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("fixture_name", "expected_filename"),
+    [
+        ("task_conda_toml", "conda.toml"),
+        ("task_pixi_toml", "pixi.toml"),
+    ],
+)
+def test_detect_task_file(fixture_name, expected_filename, request):
+    path = request.getfixturevalue(fixture_name)
+    found = detect_task_file(path.parent)
+    assert found is not None
+    assert found.name == expected_filename
+
+
+def test_detect_task_priority_conda_over_pixi(
+    tmp_project, task_pixi_toml, task_conda_toml
+):
+    """conda.toml takes priority over pixi.toml."""
+    found = detect_task_file(tmp_project)
+    assert found is not None
+    assert found.name == "conda.toml"
+
+
+def test_detect_task_priority_conda_over_pyproject(
+    tmp_project, task_conda_toml, task_pyproject
+):
+    """conda.toml takes priority over pyproject.toml."""
+    found = detect_task_file(tmp_project)
+    assert found is not None
+    assert found.name == "conda.toml"
+
+
+def test_detect_task_none(tmp_project):
+    assert detect_task_file(tmp_project) is None
+
+
+@pytest.mark.parametrize(
+    ("fixture_name", "parser_class"),
+    [
+        ("task_conda_toml", CondaTomlParser),
+        ("task_pixi_toml", PixiTomlParser),
+    ],
+)
+def test_get_task_parser(fixture_name, parser_class, request):
+    path = request.getfixturevalue(fixture_name)
+    assert isinstance(find_parser(path), parser_class)
+
+
+def test_get_task_parser_unknown(tmp_project):
+    path = tmp_project / "random.txt"
+    path.write_text("hello")
+    with pytest.raises(WorkspaceParseError):
+        find_parser(path)
+
+
+def test_detect_and_parse_tasks_with_file(sample_yaml):
+    path, tasks = detect_and_parse_tasks(file_path=sample_yaml)
+    assert path == sample_yaml.resolve()
+    assert "build" in tasks
+
+
+def test_detect_and_parse_tasks_no_file(tmp_path):
+    with pytest.raises(NoTaskFileError):
+        detect_and_parse_tasks(start_dir=tmp_path)
