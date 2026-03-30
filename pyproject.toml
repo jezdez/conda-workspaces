@@ -91,6 +91,7 @@ select = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra -v"
+markers = ["integration: end-to-end workflow tests"]
 
 [tool.ty.environment]
 python-version = "3.10"
