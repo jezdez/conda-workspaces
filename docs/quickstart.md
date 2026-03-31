@@ -2,22 +2,29 @@
 
 ## Installation
 
-### As a conda plugin
+::::{tab-set}
 
-Install into your conda base environment to get `conda workspace` and
-`conda task` subcommands:
+:::{tab-item} conda
 
 ```bash
 conda install -c conda-forge conda-workspaces
 ```
 
-### Standalone
+:::
 
-Install as a standalone tool to get the `cw` and `ct` shortcut commands:
+:::{tab-item} pixi
 
 ```bash
 pixi global install conda-workspaces
 ```
+
+:::
+
+::::
+
+Both methods provide the `cw` and `ct` shortcut commands.
+Installing into a conda base environment also registers the
+`conda workspace` and `conda task` plugin subcommands.
 
 ## Your first tasks
 
