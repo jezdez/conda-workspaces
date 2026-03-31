@@ -60,3 +60,6 @@ Thumbs.db
 
 # Version file (auto-generated)
 conda_workspaces/_version.py
+
+# rattler-build output
+output/
