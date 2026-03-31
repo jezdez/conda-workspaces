@@ -18,9 +18,7 @@ if TYPE_CHECKING:
     import argparse
 
 
-def execute_import(
-    args: argparse.Namespace, *, console: Console | None = None
-) -> int:
+def execute_import(args: argparse.Namespace, *, console: Console | None = None) -> int:
     """Execute the ``conda workspace import`` subcommand."""
     if console is None:
         console = Console(highlight=False)
@@ -37,8 +35,12 @@ def execute_import(
     importer = find_importer(source)
     if not quiet:
         status.message(
-            console, "Reading", "manifest", source.name,
-            style="bold blue", ellipsis=True,
+            console,
+            "Reading",
+            "manifest",
+            source.name,
+            style="bold blue",
+            ellipsis=True,
         )
 
     doc = importer.convert(source)
@@ -46,7 +48,10 @@ def execute_import(
 
     if not quiet:
         status.message(
-            console, "Detected", "format", source.name,
+            console,
+            "Detected",
+            "format",
+            source.name,
             detail=type(importer).__name__,
         )
 
@@ -66,7 +71,10 @@ def execute_import(
     output.write_text(text, encoding="utf-8")
     if not quiet:
         status.message(
-            console, "Wrote", "workspace", output.name,
+            console,
+            "Wrote",
+            "workspace",
+            output.name,
             detail=str(output.parent),
         )
 

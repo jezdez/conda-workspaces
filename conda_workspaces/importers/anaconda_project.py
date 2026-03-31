@@ -39,14 +39,10 @@ class AnacondaProjectImporter(ManifestImporter):
         env_specs = ap.get("env_specs", {})
         default_spec = env_specs.get("default")
         if default_spec and default_spec.get("packages"):
-            for k, v in self.parse_conda_deps(
-                default_spec["packages"]
-            ).items():
+            for k, v in self.parse_conda_deps(default_spec["packages"]).items():
                 if k not in base_deps:
                     base_deps[k] = v
-            for k, v in self.parse_pip_deps(
-                default_spec["packages"]
-            ).items():
+            for k, v in self.parse_pip_deps(default_spec["packages"]).items():
                 if k not in base_pypi:
                     base_pypi[k] = v
 
@@ -63,15 +59,11 @@ class AnacondaProjectImporter(ManifestImporter):
                 continue
             if spec and spec.get("packages"):
                 env_deps = self.parse_conda_deps(spec["packages"])
-                feature_deps = {
-                    k: v for k, v in env_deps.items() if k not in base_deps
-                }
+                feature_deps = {k: v for k, v in env_deps.items() if k not in base_deps}
                 if feature_deps:
                     features[env_name] = feature_deps
             env_features = [env_name] if env_name in features else []
-            environments[env_name] = (
-                {"features": env_features} if env_features else []
-            )
+            environments[env_name] = {"features": env_features} if env_features else []
 
         self.add_features(doc, features, environments)
 
@@ -82,9 +74,7 @@ class AnacondaProjectImporter(ManifestImporter):
                 tasks[cmd_name] = task
 
         for dl_name, dl_spec in ap.get("downloads", {}).items():
-            url = (
-                dl_spec if isinstance(dl_spec, str) else dl_spec.get("url", "")
-            )
+            url = dl_spec if isinstance(dl_spec, str) else dl_spec.get("url", "")
             if url:
                 filename = dl_name.lower().replace("_", "-")
                 tasks[f"download-{filename}"] = {

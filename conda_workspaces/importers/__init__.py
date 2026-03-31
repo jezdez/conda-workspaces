@@ -36,10 +36,7 @@ def find_importer(path: Path) -> ManifestImporter:
     for importer in _IMPORTERS:
         if importer.can_handle(path):
             return importer
-    supported = ", ".join(
-        fn for imp in _IMPORTERS for fn in imp.filenames
-    )
+    supported = ", ".join(fn for imp in _IMPORTERS for fn in imp.filenames)
     raise ValueError(
-        f"Unrecognised manifest format: '{path.name}'. "
-        f"Supported filenames: {supported}"
+        f"Unrecognised manifest format: '{path.name}'. Supported filenames: {supported}"
     )

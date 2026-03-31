@@ -69,19 +69,13 @@ class CondaProjectImporter(ManifestImporter):
                 if env_path.exists():
                     env_data = self.load_yaml(env_path)
                     env_deps.update(
-                        self.parse_conda_deps(
-                            env_data.get("dependencies", [])
-                        )
+                        self.parse_conda_deps(env_data.get("dependencies", []))
                     )
-            feature_deps = {
-                k: v for k, v in env_deps.items() if k not in base_deps
-            }
+            feature_deps = {k: v for k, v in env_deps.items() if k not in base_deps}
             if feature_deps:
                 features[env_name] = feature_deps
             env_features = [env_name] if env_name in features else []
-            environments[env_name] = (
-                {"features": env_features} if env_features else []
-            )
+            environments[env_name] = {"features": env_features} if env_features else []
 
         self.add_features(doc, features, environments)
 
@@ -94,17 +88,12 @@ class CondaProjectImporter(ManifestImporter):
                 if not cmd:
                     continue
                 task: dict[str, Any] = {"cmd": cmd}
-                if (
-                    spec.get("environment")
-                    and spec["environment"] != "default"
-                ):
+                if spec.get("environment") and spec["environment"] != "default":
                     task["default-environment"] = spec["environment"]
                 env_vars: dict[str, str] = {}
                 if spec.get("variables"):
                     for k, v in spec["variables"].items():
-                        env_vars[str(k)] = (
-                            str(v) if v is not None else ""
-                        )
+                        env_vars[str(k)] = str(v) if v is not None else ""
                 if env_vars:
                     task["env"] = env_vars
                 tasks[cmd_name] = cmd if len(task) == 1 else task

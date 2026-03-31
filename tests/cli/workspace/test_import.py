@@ -154,12 +154,8 @@ def test_import_manifest_produces_workspace(
 
 
 def test_import_conda_project(tmp_path: Path) -> None:
-    (tmp_path / "conda-project.yml").write_text(
-        _CONDA_PROJECT_YML, encoding="utf-8"
-    )
-    (tmp_path / "environment.yml").write_text(
-        _CONDA_PROJECT_ENV_YML, encoding="utf-8"
-    )
+    (tmp_path / "conda-project.yml").write_text(_CONDA_PROJECT_YML, encoding="utf-8")
+    (tmp_path / "environment.yml").write_text(_CONDA_PROJECT_ENV_YML, encoding="utf-8")
     doc = find_importer(tmp_path / "conda-project.yml").convert(
         tmp_path / "conda-project.yml"
     )
