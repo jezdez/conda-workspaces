@@ -19,6 +19,14 @@ without it.
 
 ::::{tab-set}
 
+:::{tab-item} pixi
+
+```bash
+pixi global install conda-workspaces
+```
+
+:::
+
 :::{tab-item} uv
 
 ```bash
@@ -40,16 +48,6 @@ pipx install conda-workspaces
 ```bash
 pip install conda-workspaces
 ```
-
-:::
-
-:::{tab-item} pixi
-
-```bash
-pixi global install conda-workspaces
-```
-
-Exposes `cw` and `ct` as standalone commands.
 
 :::
 
