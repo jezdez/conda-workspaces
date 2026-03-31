@@ -9,6 +9,7 @@ import tomlkit
 from conda.exceptions import CondaSystemExit, DryRunExit
 from conda.reporters import confirm_yn
 from rich.console import Console
+from rich.syntax import Syntax
 
 from ...importers import find_importer
 from .. import status
@@ -51,8 +52,6 @@ def execute_import(
 
     if dry_run:
         if console.is_terminal:
-            from rich.syntax import Syntax
-
             console.print(Syntax(text, "toml", theme="ansi_dark"))
         else:
             print(text, end="", file=console.file)
