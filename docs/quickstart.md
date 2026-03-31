@@ -19,6 +19,14 @@ without it.
 
 ::::{tab-set}
 
+:::{tab-item} uv
+
+```bash
+uv tool install conda-workspaces
+```
+
+:::
+
 :::{tab-item} pipx
 
 ```bash
