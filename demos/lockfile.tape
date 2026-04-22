@@ -33,23 +33,18 @@ Enter
 Wait /\$/
 Sleep 2s
 
-Type "# Lock every platform declared in conda.toml"
+Type "# Lock every platform declared in conda.toml — one (env, platform) per line"
 Enter
 Sleep 500ms
 
 Type@80ms "conda workspace lock"
 Enter
 Wait /\$/
-Sleep 2s
+Sleep 3s
 
-Type "# Both platforms are captured in a single conda.lock"
+Type "# All platforms live inside a single conda.lock file"
 Enter
 Sleep 500ms
-
-Type@80ms `rg '^      (linux-64|osx-arm64):$' conda.lock`
-Enter
-Wait /\$/
-Sleep 2s
 
 Type@80ms "head -15 conda.lock"
 Enter

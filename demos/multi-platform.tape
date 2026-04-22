@@ -49,23 +49,13 @@ Sleep 500ms
 Type@80ms "conda workspace lock"
 Enter
 Wait /\$/
-Sleep 2s
-
-Type@80ms `rg '^      (linux-64|osx-arm64|win-64):$' conda.lock`
-Enter
-Wait /\$/
-Sleep 2s
+Sleep 3s
 
 Type "# Narrow to a subset when iterating — typos fail fast"
 Enter
 Sleep 500ms
 
 Type@80ms "conda workspace lock --platform linux-64"
-Enter
-Wait /\$/
-Sleep 2s
-
-Type@80ms `rg '^      (linux-64|osx-arm64|win-64):$' conda.lock`
 Enter
 Wait /\$/
 Sleep 3s
