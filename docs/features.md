@@ -253,6 +253,8 @@ removed.
 
 ## Platform targeting
 
+![multi-platform demo](../demos/multi-platform.gif)
+
 Per-platform dependency overrides use `[target.<platform>]` tables:
 
 ```toml
@@ -268,6 +270,23 @@ llvm-openmp = ">=14.0"
 
 Platform overrides are merged on top of the base dependencies when
 resolving for a specific platform.
+
+### Known vs. declared platforms
+
+The workspace-level `platforms` list is the default set every
+environment can be solved for. Individual features may declare
+additional platforms, and those are reachable through any
+environment that activates that feature. To see the full reachable
+set, run:
+
+```bash
+conda workspace info            # text view, extra "Known Platforms" row
+conda workspace info --json     # JSON "known_platforms" key
+```
+
+`conda workspace lock --platform <subdir>` validates against this
+reachable set, so typos like `lixux-64` are rejected before the
+solver runs.
 
 ## PyPI dependencies
 
@@ -371,8 +390,14 @@ and records the solution — it does not require environments to be
 installed first.
 
 ```bash
-# Generate or update the lockfile
+# Generate or update the lockfile for every platform declared in the manifest
 conda workspace lock
+
+# Lock only a subset of platforms (repeatable flag)
+conda workspace lock --platform linux-64 --platform osx-arm64
+
+# Keep going when individual (environment, platform) pairs fail to solve
+conda workspace lock --skip-unsolvable
 
 # Install from lockfile, validating freshness against the manifest
 conda workspace install --locked
@@ -380,6 +405,23 @@ conda workspace install --locked
 # Install from lockfile as-is without checking freshness
 conda workspace install --frozen
 ```
+
+`conda workspace lock` solves every environment for every platform it
+declares in the manifest. Each solve runs with conda's
+`context._subdir` pointed at the target platform so virtual packages
+(`__linux`, `__osx`, `__win`) match the target, not the host. Pin
+tighter constraints with `CONDA_OVERRIDE_*` or the
+`[system-requirements]` table when cross-compiling (for example, to
+fix a minimum `__glibc` version when solving `linux-64` from macOS).
+
+Solves are fail-fast by default: the first platform that cannot be
+resolved raises an error that names the environment and the platform,
+and no lockfile is written. Pass `--skip-unsolvable` to keep locking
+the remaining pairs, emitting a yellow `Skipping ...` line for each
+one that failed. If *every* pair fails, the command still raises
+with an aggregated summary rather than writing an empty lockfile —
+non-solver errors (missing channel, invalid manifest, etc.) always
+abort regardless of the flag.
 
 The lockfile contains all environments and their resolved packages:
 

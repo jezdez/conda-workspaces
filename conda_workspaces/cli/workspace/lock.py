@@ -6,13 +6,15 @@ from typing import TYPE_CHECKING
 
 from rich.console import Console
 
-from ...exceptions import EnvironmentNotFoundError
+from ...exceptions import EnvironmentNotFoundError, PlatformError
 from ...lockfile import generate_lockfile
-from ...resolver import resolve_all_environments, resolve_environment
+from ...resolver import known_platforms, resolve_all_environments, resolve_environment
 from . import workspace_context_from_args
 
 if TYPE_CHECKING:
     import argparse
+
+    from ...exceptions import SolveError
 
 
 def execute_lock(args: argparse.Namespace, *, console: Console | None = None) -> int:
@@ -22,6 +24,8 @@ def execute_lock(args: argparse.Namespace, *, console: Console | None = None) ->
     config, ctx = workspace_context_from_args(args)
 
     env_name = getattr(args, "environment", None)
+    requested_platforms: list[str] | None = getattr(args, "platform", None) or None
+    skip_unsolvable: bool = bool(getattr(args, "skip_unsolvable", False))
 
     if env_name:
         if env_name not in config.environments:
@@ -30,17 +34,45 @@ def execute_lock(args: argparse.Namespace, *, console: Console | None = None) ->
                 list(config.environments.keys()),
             )
         resolved = resolve_environment(config, env_name, ctx.platform)
-        console.print(
-            "[bold blue]Updating[/bold blue] [bold]conda.lock[/bold][dim]...[/dim]"
-        )
-        generate_lockfile(ctx, {env_name: resolved})
-        console.print("[bold cyan]Updated[/bold cyan] [bold]conda.lock[/bold]")
+        resolved_envs = {env_name: resolved}
     else:
-        resolved_all = resolve_all_environments(config, ctx.platform)
+        resolved_envs = resolve_all_environments(config, ctx.platform)
+
+    platforms: tuple[str, ...] | None = None
+    if requested_platforms:
+        # Catch --platform typos (e.g. "lixux-64") before the solver
+        # burns any time by validating against the full reachable
+        # platform set — workspace + feature declarations surfaced via
+        # resolved_envs.
+        known = known_platforms(config, resolved_envs.values())
+        for platform in requested_platforms:
+            if platform not in known:
+                raise PlatformError(platform, sorted(known))
+        platforms = tuple(requested_platforms)
+
+    def _progress(env: str, platform: str) -> None:
         console.print(
-            "[bold blue]Updating[/bold blue] [bold]conda.lock[/bold][dim]...[/dim]"
+            f"[bold blue]Locking[/bold blue] [bold]{env}[/bold]"
+            f" for [bold]{platform}[/bold][dim]...[/dim]"
         )
-        generate_lockfile(ctx, resolved_all)
-        console.print("[bold cyan]Updated[/bold cyan] [bold]conda.lock[/bold]")
+
+    def _on_skip(env: str, platform: str, exc: SolveError) -> None:
+        console.print(
+            f"[bold yellow]Skipping[/bold yellow] [bold]{env}[/bold]"
+            f" on [bold]{platform}[/bold][dim]:[/dim] {exc.reason}"
+        )
+
+    console.print(
+        "[bold blue]Updating[/bold blue] [bold]conda.lock[/bold][dim]...[/dim]"
+    )
+    generate_lockfile(
+        ctx,
+        resolved_envs,
+        platforms=platforms,
+        progress=_progress,
+        skip_unsolvable=skip_unsolvable,
+        on_skip=_on_skip if skip_unsolvable else None,
+    )
+    console.print("[bold cyan]Updated[/bold cyan] [bold]conda.lock[/bold]")
 
     return 0

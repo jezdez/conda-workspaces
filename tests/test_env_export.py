@@ -138,3 +138,32 @@ def test_multiplatform_export_empty() -> None:
     assert "version: 1" in yaml_str
     assert "environments: {}" in yaml_str
     assert "packages: []" in yaml_str
+
+
+def test_multiplatform_export_handles_str_subclass_keys() -> None:
+    """``str`` subclass env/platform keys are coerced before YAML dump.
+
+    ``ruamel.yaml`` dispatches representers by exact type, so a
+    ``str`` subclass (e.g. ``tomlkit.items.String``) reaching the
+    YAML writer as a dict key raises ``TypeError: Object of type ...
+    is not YAML serializable``.  The parsers normalise at the
+    boundary and the exporter is defensive; this test pins both
+    behaviours so a regression in either layer fails loudly rather
+    than at a user's first ``conda workspace lock`` invocation.
+    """
+
+    class FakeStr(str):
+        pass
+
+    pkg = FakeRecord("python", "https://example.com/python-3.10.conda")
+    env = FakeEnvironment(
+        name=FakeStr("default"),
+        platform=FakeStr("linux-64"),
+        channels=("conda-forge",),
+        packages=[pkg],
+    )
+
+    yaml_str = multiplatform_export([env])  # type: ignore[arg-type]
+
+    assert "default:" in yaml_str
+    assert "linux-64:" in yaml_str

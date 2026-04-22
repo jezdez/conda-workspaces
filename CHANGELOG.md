@@ -6,6 +6,45 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+### Added
+
+- `conda workspace lock` now writes a single `conda.lock` that covers
+  every platform declared by each environment, not just the host
+  platform. Target-platform solves run with `context._subdir`
+  overridden for the duration of the solve so conda's virtual package
+  plugins (`__linux`, `__osx`, `__win`) and the solver's `subdirs`
+  resolution both target the correct subdir. `CONDA_OVERRIDE_*` and
+  the manifest `[system-requirements]` table continue to work as
+  before, so downstream constraints like `__glibc`, `__cuda`, or
+  `__osx` can be pinned explicitly when solving for platforms the
+  host machine would not otherwise advertise.
+- `conda workspace lock --platform <subdir>` restricts the lock run
+  to a subset of declared platforms. The flag is repeatable
+  (`--platform linux-64 --platform osx-arm64`). Unknown platforms
+  raise `PlatformError` before any solve runs.
+- `SolveError` now names the target platform when it is known, so
+  per-platform failures are easy to spot in CI logs.
+- `conda workspace lock --skip-unsolvable` keeps locking the remaining
+  `(environment, platform)` pairs when an individual solve fails,
+  emitting a yellow `Skipping ...` line for each skipped pair. The
+  command still raises `AllTargetsUnsolvableError` with an aggregated
+  summary if *every* pair fails, so CI never writes an empty lockfile.
+  Non-solver errors (missing channel, invalid manifest, etc.) continue
+  to abort regardless of the flag.
+- `conda_workspaces.resolver.known_platforms(config, resolved_envs)`
+  centralises the "platforms this workspace could legitimately be
+  solved for" computation (workspace platforms unioned with the
+  platforms surfaced by each resolved environment). `conda workspace
+  lock` now uses it to validate `--platform`, and `conda workspace
+  info` surfaces the reachable set as a `known_platforms` JSON key
+  (and an extra `Known Platforms` row in the text output whenever a
+  feature broadens the workspace-level set).
+- New `demos/multi-platform.{tape,gif,mp4}` demo showcasing
+  cross-platform locking, the reachable-platform row in
+  `conda workspace info`, and the `--platform` subset flag. The
+  existing `demos/lockfile` recording was refreshed to show the
+  multi-platform default output.
+
 ### Changed
 
 - Internal refactor of the `conda.lock` write path: `generate_lockfile`

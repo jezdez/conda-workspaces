@@ -40,8 +40,15 @@ def _envs_to_dict(envs: Iterable[Environment]) -> dict[str, Any]:
 
     for env in envs:
         validate_urls(env, FORMAT)
-        env_name = env.name or "default"
-        platform = env.platform
+        # ruamel.yaml dispatches representers by exact type on dict
+        # keys, so any ``str`` subclass reaching this point (e.g. a
+        # leaked ``tomlkit.items.String``) raises ``TypeError: Object
+        # of type ... is not YAML serializable``.  Workspace parsers
+        # unwrap tomlkit docs at load time; this is the last-line
+        # guard for callers that build ``Environment`` objects through
+        # other paths (``conda export`` plugin, tests, third parties).
+        env_name = str(env.name or "default")
+        platform = str(env.platform)
 
         if env_name not in environments:
             environments[env_name] = {

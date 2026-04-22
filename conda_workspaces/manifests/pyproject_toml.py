@@ -56,7 +56,10 @@ class PyprojectTomlParser(ManifestParser):
     def parse(self, path: Path) -> WorkspaceConfig:
         try:
             text = path.read_text(encoding="utf-8")
-            data = tomlkit.loads(text)
+            # ``unwrap()`` collapses tomlkit subclasses to native Python
+            # types so downstream code (resolver, exporter, YAML writer)
+            # never has to defend against ``tomlkit.items.String`` etc.
+            data = tomlkit.loads(text).unwrap()
         except Exception as exc:
             raise WorkspaceParseError(path, str(exc)) from exc
 

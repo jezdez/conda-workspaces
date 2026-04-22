@@ -129,14 +129,51 @@ class PlatformError(CondaWorkspacesError):
 
 
 class SolveError(CondaWorkspacesError):
-    """Dependency solving failed for an environment."""
+    """Dependency solving failed for an environment, optionally scoped to a platform."""
 
-    def __init__(self, environment: str, reason: str) -> None:
+    def __init__(
+        self,
+        environment: str,
+        reason: str,
+        *,
+        platform: str | None = None,
+    ) -> None:
         self.environment = environment
         self.reason = reason
+        self.platform = platform
+        target = (
+            f"environment '{environment}' for platform '{platform}'"
+            if platform
+            else f"environment '{environment}'"
+        )
         super().__init__(
-            f"Failed to solve environment '{environment}': {reason}",
+            f"Failed to solve {target}: {reason}",
             hints=["Check your dependency specifications and channel configuration."],
+        )
+
+
+class AllTargetsUnsolvableError(CondaWorkspacesError):
+    """Every ``(environment, platform)`` pair failed under ``--skip-unsolvable``.
+
+    Raised after the loop when at least one pair failed to solve *and*
+    no pair succeeded, so writing a lockfile would produce an empty
+    file that silently loses every environment.
+    """
+
+    def __init__(self, failures: list[SolveError]) -> None:
+        self.failures = failures
+        summary = "\n".join(
+            f"  - {failure.environment}"
+            + (f" on {failure.platform}" if failure.platform else "")
+            + f": {failure.reason}"
+            for failure in failures
+        )
+        super().__init__(
+            "Every (environment, platform) pair failed to solve:\n" + summary,
+            hints=[
+                "Fix at least one pair, or re-run without --skip-unsolvable"
+                " to see a single fail-fast error.",
+            ],
         )
 
 

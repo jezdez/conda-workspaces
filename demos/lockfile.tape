@@ -24,7 +24,7 @@ Enter
 Wait /\$/
 Show
 
-Type "# Install and solve dependencies"
+Type "# Install and solve for the current platform"
 Enter
 Sleep 500ms
 
@@ -33,16 +33,20 @@ Enter
 Wait /\$/
 Sleep 2s
 
-Type "# Generate a lockfile for reproducible installs"
+Type "# Lock every platform declared in conda.toml — one (env, platform) per line"
 Enter
 Sleep 500ms
 
 Type@80ms "conda workspace lock"
 Enter
 Wait /\$/
-Sleep 2s
+Sleep 3s
 
-Type@80ms "head -20 conda.lock"
+Type "# All platforms live inside a single conda.lock file"
+Enter
+Sleep 500ms
+
+Type@80ms "head -15 conda.lock"
 Enter
 Wait /\$/
 Sleep 3s
