@@ -14,33 +14,6 @@ from . import workspace_context_from_args
 if TYPE_CHECKING:
     import argparse
 
-    from ...resolver import ResolvedEnvironment
-
-
-def _validate_platforms(
-    requested: list[str] | None,
-    declared: list[str],
-    resolved_envs: dict[str, ResolvedEnvironment],
-) -> tuple[str, ...] | None:
-    """Return the platform tuple to pass to :func:`generate_lockfile`.
-
-    *requested* is the raw ``--platform`` value from argparse (or
-    ``None`` when omitted).  Each requested platform must be declared
-    by the workspace *and* by at least one of the resolved
-    environments, otherwise we raise :class:`PlatformError` before
-    touching the solver.
-    """
-    if not requested:
-        return None
-    env_platforms: set[str] = set()
-    for resolved in resolved_envs.values():
-        env_platforms.update(resolved.platforms or declared or [])
-    known = set(declared) | env_platforms
-    for platform in requested:
-        if platform not in known:
-            raise PlatformError(platform, sorted(known))
-    return tuple(requested)
-
 
 def execute_lock(args: argparse.Namespace, *, console: Console | None = None) -> int:
     """Solve workspace environments and write ``conda.lock``."""
@@ -62,11 +35,18 @@ def execute_lock(args: argparse.Namespace, *, console: Console | None = None) ->
     else:
         resolved_envs = resolve_all_environments(config, ctx.platform)
 
-    platforms = _validate_platforms(
-        requested_platforms,
-        list(config.platforms),
-        resolved_envs,
-    )
+    platforms: tuple[str, ...] | None = None
+    if requested_platforms:
+        # A requested platform must be declared either by the workspace
+        # or by at least one of the resolved environments, so CI catches
+        # typos before the solver burns any time.
+        known: set[str] = set(config.platforms)
+        for resolved in resolved_envs.values():
+            known.update(resolved.platforms or config.platforms or [])
+        for platform in requested_platforms:
+            if platform not in known:
+                raise PlatformError(platform, sorted(known))
+        platforms = tuple(requested_platforms)
 
     def _progress(env: str, platform: str) -> None:
         console.print(

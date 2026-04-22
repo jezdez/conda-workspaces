@@ -146,7 +146,23 @@ class CondaLockLoader(EnvironmentSpecBase):
                 f"Lockfile does not list packages for platform {platform!r}. "
                 f"Available platforms: {dashlist(platforms)}."
             )
-        return self._to_env(platform, name)
+
+        # Share rattler-lock v6 conversion with conda-lockfiles via a
+        # localised in-memory version byte swap.  Disk file is untouched.
+        # Shallow copy is sufficient: we only overwrite the top-level
+        # ``version`` key; nested structures stay shared with the cache
+        # and must not be mutated by the upstream helper.
+        #
+        # TODO: switch to the public ``rattler_lock_v6_to_conda_env`` +
+        # ``RattlerLockV6`` pydantic model once conda-lockfiles ships
+        # the APIs added in conda-incubator/conda-lockfiles#128.  The
+        # current private helper is stable across the 0.1.x line but is
+        # not part of the public contract.
+        from conda_lockfiles.rattler_lock.v6 import _rattler_lock_v6_to_env
+
+        payload = dict(self._data)
+        payload["version"] = 6
+        return _rattler_lock_v6_to_env(name=name, platform=platform, **payload)
 
     @property
     def env(self) -> Environment:
@@ -175,25 +191,6 @@ class CondaLockLoader(EnvironmentSpecBase):
                 f"Available environments: {dashlist(sorted(environments))}"
             )
         return environments[name]
-
-    def _to_env(self, platform: str, name: str = "default") -> Environment:
-        # Share rattler-lock v6 conversion with conda-lockfiles via a
-        # localised in-memory version byte swap.  Disk file is untouched.
-        #
-        # TODO: switch to the public ``rattler_lock_v6_to_conda_env`` +
-        # ``RattlerLockV6`` pydantic model once conda-lockfiles ships
-        # the APIs added in conda-incubator/conda-lockfiles#128.  The
-        # current private helper is stable across the 0.1.x line but is
-        # not part of the public contract.
-        from conda_lockfiles.rattler_lock.v6 import _rattler_lock_v6_to_env
-
-        # Shallow copy is sufficient: we only overwrite the top-level
-        # ``version`` key.  Nested structures (environments, packages)
-        # are still shared with ``self._data_cache`` and must not be
-        # mutated by the upstream helper.
-        payload = dict(self._data)
-        payload["version"] = 6
-        return _rattler_lock_v6_to_env(name=name, platform=platform, **payload)
 
 
 def _solve_for_records(
@@ -264,26 +261,6 @@ def _solve_for_records(
             raise SolveError(resolved.name, str(exc), platform=platform) from exc
 
 
-def _platforms_for(
-    resolved: ResolvedEnvironment,
-    host_platform: str,
-    requested: tuple[str, ...] | None,
-) -> list[str]:
-    """Return the sorted list of platforms to lock *resolved* for.
-
-    When *requested* is ``None``, uses the platforms declared on the
-    resolved environment, falling back to the host platform for
-    workspaces that do not pin any platforms.  When *requested* is
-    given, intersects with the declared platforms so callers cannot
-    silently produce a lockfile entry for a platform the environment
-    is not advertised to support.
-    """
-    declared = list(resolved.platforms) if resolved.platforms else [host_platform]
-    if requested is None:
-        return sorted(set(declared))
-    return sorted(set(requested) & set(declared))
-
-
 def generate_lockfile(
     ctx: WorkspaceContext,
     resolved_envs: dict[str, ResolvedEnvironment],
@@ -322,11 +299,17 @@ def generate_lockfile(
         try:
             sys.stdout = devnull
             for name, resolved in resolved_envs.items():
-                env_platforms = _platforms_for(resolved, host_platform, platforms)
-                if not env_platforms:
+                # Intersect declared platforms with the requested subset.
+                # ``requested=None`` means "lock everything the env declares";
+                # an env with no declared platforms falls back to the host.
+                declared = set(resolved.platforms or [host_platform])
+                targets = sorted(
+                    declared if platforms is None else declared & set(platforms)
+                )
+                if not targets:
                     continue
                 channels = tuple(str(ch) for ch in resolved.channels)
-                for target in env_platforms:
+                for target in targets:
                     if progress is not None:
                         # Render outside the devnull stdout redirection.
                         sys.stdout = real_stdout
