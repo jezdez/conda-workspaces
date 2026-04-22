@@ -12,7 +12,7 @@ how the two tools relate and how to use them side by side.
 |---|---|---|
 | Solver | rattler (bundled) | conda / libmamba |
 | Environment location | `.pixi/envs/` | `.conda/envs/` |
-| Lock file | `pixi.lock` | `conda.lock` |
+| Lock file | `pixi.lock` | `conda.lock` (same schema family as `pixi.lock`, distinct filename and on-disk version byte) |
 | Task runner | Built-in | Built-in (`conda task`) |
 | Template engine | MiniJinja (Rust) | Jinja2 (Python) |
 | Shell | `deno_task_shell` | Native platform shell |

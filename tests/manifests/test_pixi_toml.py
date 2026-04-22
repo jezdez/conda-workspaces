@@ -1,4 +1,4 @@
-"""Tests for conda_workspaces.parsers.pixi_toml (pixi.toml parser)."""
+"""Tests for conda_workspaces.manifests.pixi_toml (pixi.toml parser)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from conda_workspaces.exceptions import WorkspaceParseError
-from conda_workspaces.parsers.pixi_toml import PixiTomlParser
+from conda_workspaces.manifests.pixi_toml import PixiTomlParser
 
 
 @pytest.fixture

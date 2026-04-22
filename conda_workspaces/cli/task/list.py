@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from rich.console import Console
 from rich.table import Table
 
-from ...parsers import detect_and_parse_tasks
+from ...manifests import detect_and_parse_tasks
 
 if TYPE_CHECKING:
     import argparse

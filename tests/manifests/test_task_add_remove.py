@@ -7,12 +7,12 @@ from typing import TYPE_CHECKING
 import pytest
 
 from conda_workspaces.exceptions import TaskNotFoundError
+from conda_workspaces.manifests.pixi_toml import PixiTomlParser
+from conda_workspaces.manifests.pyproject_toml import PyprojectTomlParser
 from conda_workspaces.models import Task
-from conda_workspaces.parsers.pixi_toml import PixiTomlParser
-from conda_workspaces.parsers.pyproject_toml import PyprojectTomlParser
 
 if TYPE_CHECKING:
-    from conda_workspaces.parsers.base import ManifestParser
+    from conda_workspaces.manifests.base import ManifestParser
 
 
 @pytest.mark.parametrize(

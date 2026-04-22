@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from conda_workspaces import env_spec, lockfile
 from conda_workspaces.plugin import (
     conda_environment_exporters,
     conda_environment_specifiers,
@@ -23,11 +24,12 @@ def test_conda_subcommands_yields_workspace_and_task() -> None:
 
 
 @pytest.mark.parametrize(
-    "name, expected_cls_name",
+    ("name", "expected_cls_name"),
     [
-        ("conda-workspaces", "CondaWorkspaceSpec"),
-        ("conda-workspaces-lock", "CondaLockSpec"),
+        (env_spec.FORMAT, "CondaWorkspaceSpec"),
+        (lockfile.FORMAT, "CondaLockLoader"),
     ],
+    ids=["conda-workspaces", "conda-workspaces-lock-v1"],
 )
 def test_conda_environment_specifiers(name: str, expected_cls_name: str) -> None:
     items = {s.name: s for s in conda_environment_specifiers()}
@@ -39,9 +41,9 @@ def test_conda_environment_exporters_yields_one() -> None:
     items = list(conda_environment_exporters())
     assert len(items) == 1
     exp = items[0]
-    assert exp.name == "conda-workspaces-lock"
-    assert exp.aliases == ("workspace-lock",)
-    assert exp.default_filenames == ("conda.lock",)
+    assert exp.name == lockfile.FORMAT
+    assert exp.aliases == lockfile.ALIASES
+    assert exp.default_filenames == lockfile.DEFAULT_FILENAMES
     assert callable(exp.multiplatform_export)
 
 

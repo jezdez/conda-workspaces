@@ -88,7 +88,7 @@ def test_config_lazy_loads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
         return (tmp_path / "pixi.toml", expected_config)
 
     monkeypatch.setattr(
-        "conda_workspaces.parsers.detect_and_parse", fake_detect_and_parse
+        "conda_workspaces.manifests.detect_and_parse", fake_detect_and_parse
     )
 
     ctx = WorkspaceContext()  # no config passed

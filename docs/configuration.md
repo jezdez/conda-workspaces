@@ -29,6 +29,22 @@ define your tasks under `[tool.conda.tasks]`.
 
 When a file defines both workspace and task sections, both are used.
 
+## Lockfile format
+
+`conda workspace lock` and `conda workspace install` produce and
+consume `conda.lock`, conda-workspaces' own lockfile.  It is a
+derivative of rattler-lock v6 (`pixi.lock`): the YAML schema is the
+same, the converters in `conda-lockfiles` are reused, and only the
+on-disk `version` byte differs (`conda.lock` uses `version: 1`,
+`pixi.lock` uses `version: 6`).  The same relationship holds between
+`conda.toml` and `pixi.toml` — conda-workspaces owns the filename and
+the version byte, rattler-lock owns the schema.
+
+See [Plugin format names and
+aliases](reference/format-aliases.md) for the canonical and alias
+strings accepted by `conda env create --file conda.lock` and
+`conda export --format=...`.
+
 ## File formats
 
 ### conda.toml

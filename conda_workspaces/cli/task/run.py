@@ -12,7 +12,7 @@ from rich.tree import Tree
 from ...cache import is_cached, save_cache
 from ...exceptions import CondaWorkspacesError, TaskExecutionError
 from ...graph import resolve_execution_order
-from ...parsers import detect_and_parse_tasks
+from ...manifests import detect_and_parse_tasks
 from ...runner import SubprocessShell
 from ...template import render, render_list
 from .. import status
@@ -39,7 +39,7 @@ def _env_prefix_or_none(
     try:
         from ...context import WorkspaceContext
         from ...exceptions import CondaWorkspacesError
-        from ...parsers import detect_and_parse
+        from ...manifests import detect_and_parse
 
         manifest_path = getattr(args, "file", None)
         _, config = detect_and_parse(manifest_path)

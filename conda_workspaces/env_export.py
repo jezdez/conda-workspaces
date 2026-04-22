@@ -1,15 +1,17 @@
-"""Environment exporter plugin for ``conda export --format=conda-workspaces-lock``.
+"""Environment exporter plugin for ``conda export --format=<lockfile>``.
 
-Exports installed conda environments to ``conda.lock``.  This
-allows::
+Exports installed conda environments to ``conda.lock``.  Allows::
 
-    conda export --format=conda-workspaces-lock --file=conda.lock
-    conda export --format=conda-workspaces-lock \
-        --file=conda.lock --platform=linux-64 --platform=osx-arm64
+    conda export --format=conda-workspaces-lock-v1 --file=conda.lock
+    conda export --format=conda-workspaces-lock --file=conda.lock \
+        --platform=linux-64 --platform=osx-arm64
 
 The exporter uses the same serialisation logic as the built-in
 ``conda workspace lock`` command, ensuring lockfile consistency
-regardless of which code path produced the file.
+regardless of which code path produced the file.  Format metadata
+(canonical name, aliases, default filename) is owned by
+:mod:`.lockfile` so that the spec plugin, the exporter plugin and the
+hand-written write path all agree.
 """
 
 from __future__ import annotations
@@ -21,23 +23,13 @@ from conda.common.serialize.yaml import dump as yaml_dump
 from conda_lockfiles.rattler_lock.v6 import _record_to_dict
 from conda_lockfiles.validate_urls import validate_urls
 
-from .lockfile import LOCKFILE_VERSION
+from .lockfile import FORMAT, LOCKFILE_VERSION
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from typing import Any
 
     from conda.models.environment import Environment
-
-
-#: The canonical name for this exporter.
-FORMAT = "conda-workspaces-lock"
-
-#: User-friendly aliases.
-ALIASES = ("workspace-lock",)
-
-#: Default filenames this exporter handles.
-DEFAULT_FILENAMES = ("conda.lock",)
 
 
 def _envs_to_dict(envs: Iterable[Environment]) -> dict[str, Any]:
@@ -59,14 +51,12 @@ def _envs_to_dict(envs: Iterable[Environment]) -> dict[str, Any]:
 
         platform_refs: list[dict[str, str]] = []
 
-        # Conda packages
         for pkg in sorted(env.explicit_packages, key=lambda p: p.name):
             platform_refs.append({"conda": pkg.url})
             if pkg.url not in seen_urls:
                 packages.append(_record_to_dict(pkg))
                 seen_urls.add(pkg.url)
 
-        # External (PyPI) packages
         for manager, urls in env.external_packages.items():
             for url in urls:
                 platform_refs.append({manager: url})

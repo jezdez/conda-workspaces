@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from rich.console import Console
 
-from ...parsers import detect_and_parse_tasks, find_parser
+from ...manifests import detect_and_parse_tasks, find_parser
 
 if TYPE_CHECKING:
     import argparse

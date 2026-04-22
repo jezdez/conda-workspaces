@@ -7,7 +7,7 @@ import argparse
 import pytest
 
 from conda_workspaces.cli.task.add import execute_add
-from conda_workspaces.parsers.toml import CondaTomlParser
+from conda_workspaces.manifests.toml import CondaTomlParser
 
 
 @pytest.mark.parametrize(

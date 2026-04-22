@@ -23,7 +23,7 @@ class ManifestParser(ABC):
     Each parser handles one file format (``conda.toml``, ``pixi.toml``,
     or ``pyproject.toml``).  Subclasses declare which files they can
     handle via *filenames* and *extensions*.  The registry in
-    ``parsers/__init__.py`` uses these to auto-detect the right parser.
+    ``manifests/__init__.py`` uses these to auto-detect the right parser.
 
     A single parser instance handles both workspace configuration and
     task definitions from the same file.

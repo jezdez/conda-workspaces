@@ -1,11 +1,11 @@
-"""Tests for task parsing in conda_workspaces.parsers.pixi_toml."""
+"""Tests for task parsing in conda_workspaces.manifests.pixi_toml."""
 
 from __future__ import annotations
 
 import pytest
 
 from conda_workspaces.exceptions import TaskParseError
-from conda_workspaces.parsers.pixi_toml import PixiTomlParser
+from conda_workspaces.manifests.pixi_toml import PixiTomlParser
 
 
 def test_can_handle(task_pixi_toml):

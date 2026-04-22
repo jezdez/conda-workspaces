@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import tomlkit
 from rich.console import Console
 
-from ...parsers import detect_workspace_file
+from ...manifests import detect_workspace_file
 from . import workspace_context_from_args
 from .sync import affected_environments, sync_environments
 

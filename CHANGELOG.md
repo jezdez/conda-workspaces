@@ -8,6 +8,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
+- Internal refactor of the `conda.lock` read path: ``conda_workspaces.lockfile``
+  now owns both the write path and the `CondaEnvironmentSpecifier`
+  plugin (`CondaLockLoader`), and delegates YAML -> `Environment`
+  conversion to `conda_lockfiles.rattler_lock.v6` instead of
+  re-implementing it.  `conda.lock` is now documented as a derivative
+  of rattler-lock v6 (`pixi.lock`), same schema family, distinct
+  filename and on-disk version byte.
+- `conda_workspaces.parsers` renamed to `conda_workspaces.manifests`
+  (the directory is named after its subject, not the verb; class
+  names `CondaTomlParser` etc. are unchanged).  Public re-exports are
+  preserved via relative imports within the package.
+- `conda_workspaces.env_spec` shrunk to the `conda.toml` env-spec
+  plugin only (`CondaWorkspaceSpec`).  `CondaLockSpec` has been
+  replaced by `conda_workspaces.lockfile.CondaLockLoader`.
+- Plugin metadata is now exposed as module-level `FORMAT` / `ALIASES`
+  / `DEFAULT_FILENAMES` constants per plugin module.  The canonical
+  lockfile `FORMAT` changed from `conda-workspaces-lock` to
+  `conda-workspaces-lock-v1`; the old name is registered as an alias
+  alongside `workspace-lock`, so existing `conda export
+  --format=conda-workspaces-lock` invocations keep working.  See
+  `docs/reference/format-aliases.md` for the naming policy.
+
 - `conda workspace add` and `conda workspace remove` now install into
   the affected environment(s) and refresh `conda.lock` by default,
   matching `pixi add` / `pixi remove`. Use `--no-install` to update

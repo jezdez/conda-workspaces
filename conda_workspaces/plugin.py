@@ -46,27 +46,31 @@ def conda_subcommands() -> Iterable[CondaSubcommand]:
 
 @hookimpl
 def conda_environment_specifiers() -> Iterable[CondaEnvironmentSpecifier]:
-    from .env_spec import CondaLockSpec, CondaWorkspaceSpec
+    from . import env_spec, lockfile
 
+    # TODO: once CondaEnvironmentSpecifier grows aliases/default_filenames
+    # fields (conda/conda#15928), pass env_spec.ALIASES /
+    # lockfile.ALIASES / *.DEFAULT_FILENAMES through as well.  Until
+    # then, only the canonical FORMAT is registered as a spec name.
     yield CondaEnvironmentSpecifier(
-        name="conda-workspaces",
-        environment_spec=CondaWorkspaceSpec,
+        name=env_spec.FORMAT,
+        environment_spec=env_spec.CondaWorkspaceSpec,
     )
     yield CondaEnvironmentSpecifier(
-        name="conda-workspaces-lock",
-        environment_spec=CondaLockSpec,
+        name=lockfile.FORMAT,
+        environment_spec=lockfile.CondaLockLoader,
     )
 
 
 @hookimpl
 def conda_environment_exporters() -> Iterable[CondaEnvironmentExporter]:
-    from .env_export import ALIASES, DEFAULT_FILENAMES, FORMAT, multiplatform_export
+    from . import env_export, lockfile
 
     yield CondaEnvironmentExporter(
-        name=FORMAT,
-        aliases=ALIASES,
-        default_filenames=DEFAULT_FILENAMES,
-        multiplatform_export=multiplatform_export,
+        name=lockfile.FORMAT,
+        aliases=lockfile.ALIASES,
+        default_filenames=lockfile.DEFAULT_FILENAMES,
+        multiplatform_export=env_export.multiplatform_export,
     )
 
 
@@ -93,7 +97,7 @@ def _install_hint(command: str) -> None:
     log = logging.getLogger(__name__)
 
     try:
-        from .parsers import detect_workspace_file
+        from .manifests import detect_workspace_file
 
         detect_workspace_file()
     except Exception:
@@ -104,7 +108,7 @@ def _install_hint(command: str) -> None:
     target = Path(context.target_prefix)
 
     try:
-        from .parsers import detect_and_parse
+        from .manifests import detect_and_parse
 
         _, config = detect_and_parse()
         from .context import WorkspaceContext

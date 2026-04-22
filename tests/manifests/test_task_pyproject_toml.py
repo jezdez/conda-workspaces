@@ -1,11 +1,11 @@
-"""Tests for task parsing in conda_workspaces.parsers.pyproject_toml."""
+"""Tests for task parsing in conda_workspaces.manifests.pyproject_toml."""
 
 from __future__ import annotations
 
 import pytest
 
+from conda_workspaces.manifests.pyproject_toml import PyprojectTomlParser
 from conda_workspaces.models import Task
-from conda_workspaces.parsers.pyproject_toml import PyprojectTomlParser
 
 
 def test_can_handle(task_pyproject):

@@ -1,10 +1,20 @@
-"""Lockfile generation and consumption for reproducible environments.
+"""Lockfile generation, consumption and env-spec plugin for ``conda.lock``.
 
-Produces a single ``conda.lock`` at the workspace root.  The file
-captures all environments and platforms so that installations can be
-reproduced exactly without running the solver.
+Single source of truth for every ``conda.lock`` concern.  The file owns
+the read path, the write path, the ``CondaEnvironmentSpecifier`` plugin
+class (:class:`CondaLockLoader`), and the plugin metadata (name,
+aliases, default filename) consumed by ``plugin.py`` and
+``env_export.py``.
 
-The format is a YAML document with three top-level keys::
+The ``conda.lock`` format is a *derivative* of rattler-lock v6
+(``pixi.lock``): same schema machinery, same top-level keys
+(``version``, ``environments``, ``packages``), but with an on-disk
+``version: 1`` byte that identifies the file as conda-workspaces-owned.
+:class:`CondaLockLoader` shares rattler-lock v6 conversion logic with
+:mod:`conda_lockfiles.rattler_lock.v6` via an in-memory ``version: 6``
+swap, so we do not re-implement YAML -> ``Environment`` conversion.
+
+The file layout is::
 
     version: 1
     environments:
@@ -19,10 +29,11 @@ The format is a YAML document with three top-level keys::
         depends: [...]
         ...
 
-On the *write* side, ``generate_lockfile`` solves each environment
-and records the result.  On the *read* side, ``install_from_lockfile`` extracts
-the package list for one environment + platform and installs the exact
-URLs, bypassing the solver entirely.
+On the *write* side, :func:`generate_lockfile` solves each environment
+and records the result.  On the *read* side, :func:`install_from_lockfile`
+extracts the package list for one environment + platform via
+:class:`CondaLockLoader` and installs the exact URLs, bypassing the
+solver entirely.
 """
 
 from __future__ import annotations
@@ -31,27 +42,154 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from conda.common.serialize.yaml import dump as yaml_dump
-from conda.common.serialize.yaml import load as yaml_load
-from conda_lockfiles.rattler_lock.v6 import _record_to_dict
+from conda.plugins.types import EnvironmentSpecBase
 
 from .exceptions import LockfileNotFoundError, SolveError
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, ClassVar, Final
+
+    from conda.common.path import PathType
+    from conda.models.environment import Environment
 
     from .context import WorkspaceContext
     from .resolver import ResolvedEnvironment
 
-#: Lockfile format version.
-LOCKFILE_VERSION = 1
+#: On-disk lockfile format version.  Distinct from the rattler-lock v6
+#: schema version so that tools can tell a conda-workspaces-owned lock
+#: from a pixi-owned one at a glance.
+LOCKFILE_VERSION: Final = 1
 
 #: The canonical lockfile filename.
-LOCKFILE_NAME = "conda.lock"
+LOCKFILE_NAME: Final = "conda.lock"
+
+#: Canonical, versioned plugin name.  Stable across schema bumps;
+#: follows the ``conda-lockfiles`` alias policy (see
+#: ``docs/reference/format-aliases.md``).
+FORMAT: Final = "conda-workspaces-lock-v1"
+
+#: User-friendly aliases.  Unversioned names are convenience handles
+#: that may migrate to a newer ``FORMAT`` in the future.
+ALIASES: Final = ("conda-workspaces-lock", "workspace-lock")
+
+#: Default filenames this plugin handles.
+DEFAULT_FILENAMES: Final = (LOCKFILE_NAME,)
 
 
 def lockfile_path(ctx: WorkspaceContext) -> Path:
     """Return the path to the workspace lockfile (``<root>/conda.lock``)."""
     return ctx.root / LOCKFILE_NAME
+
+
+class CondaLockLoader(EnvironmentSpecBase):
+    """Environment specifier + loader for ``conda.lock``.
+
+    ``conda.lock`` is a derivative of rattler-lock v6 (``pixi.lock``);
+    this loader shares the rattler-lock v6 conversion helper from
+    :mod:`conda_lockfiles.rattler_lock.v6` by performing an in-memory
+    ``version: 1 -> 6`` swap before handing the data off.  The on-disk
+    file keeps ``version: 1`` unchanged.
+
+    Used by ``conda env create --file conda.lock`` (single platform via
+    ``env``) and by ``conda workspace install`` (multi-platform via
+    ``env_for``).
+    """
+
+    detection_supported: ClassVar[bool] = True
+
+    def __init__(self, path: PathType) -> None:
+        self.path = Path(path).resolve()
+        self._data_cache: dict[str, Any] | None = None
+
+    def can_handle(self) -> bool:
+        if self.path.name not in DEFAULT_FILENAMES:
+            return False
+        if not self.path.exists():
+            return False
+        try:
+            return self._data.get("version") == LOCKFILE_VERSION
+        except Exception:
+            return False
+
+    @property
+    def _data(self) -> dict[str, Any]:
+        if self._data_cache is None:
+            from conda_lockfiles.load_yaml import load_yaml
+
+            self._data_cache = load_yaml(self.path)
+        return self._data_cache
+
+    @property
+    def available_platforms(self) -> tuple[str, ...]:
+        """Platforms declared in this lockfile's default environment."""
+        env_data = self._env_data("default")
+        return tuple(sorted(env_data.get("packages", {})))
+
+    def env_for(self, platform: str, name: str = "default") -> Environment:
+        """Return the conda ``Environment`` for *platform* and *name*.
+
+        Raises ``ValueError`` if *platform* is not in the lockfile or
+        *name* does not identify a declared environment.
+        """
+        # TODO: raise conda.exceptions.PlatformMismatchError once that
+        # lands in a released conda (tracked in conda/conda#15928).
+        env_data = self._env_data(name)
+        platforms = tuple(sorted(env_data.get("packages", {})))
+        if platform not in platforms:
+            from conda.common.io import dashlist
+
+            raise ValueError(
+                f"Lockfile does not list packages for platform {platform!r}. "
+                f"Available platforms: {dashlist(platforms)}."
+            )
+        return self._to_env(platform, name)
+
+    @property
+    def env(self) -> Environment:
+        """Return the default environment for the current subdir.
+
+        Kept for backwards compatibility with ``conda env create --file
+        conda.lock``; delegates to :meth:`env_for`.
+        """
+        from conda.base.context import context
+
+        return self.env_for(context.subdir)
+
+    def _env_data(self, name: str = "default") -> dict[str, Any]:
+        data = self._data
+        if data.get("version") != LOCKFILE_VERSION:
+            raise ValueError(
+                f"Unsupported {LOCKFILE_NAME} version: {data.get('version')!r} "
+                f"(expected {LOCKFILE_VERSION})"
+            )
+        environments = data.get("environments", {})
+        if name not in environments:
+            from conda.common.io import dashlist
+
+            raise ValueError(
+                f"Environment {name!r} not found in lockfile. "
+                f"Available environments: {dashlist(sorted(environments))}"
+            )
+        return environments[name]
+
+    def _to_env(self, platform: str, name: str = "default") -> Environment:
+        # Share rattler-lock v6 conversion with conda-lockfiles via a
+        # localised in-memory version byte swap.  Disk file is untouched.
+        #
+        # TODO: switch to the public ``rattler_lock_v6_to_conda_env`` +
+        # ``RattlerLockV6`` pydantic model once conda-lockfiles ships
+        # the APIs added in conda-incubator/conda-lockfiles#128.  The
+        # current private helper is stable across the 0.1.x line but is
+        # not part of the public contract.
+        from conda_lockfiles.rattler_lock.v6 import _rattler_lock_v6_to_env
+
+        # Shallow copy is sufficient: we only overwrite the top-level
+        # ``version`` key.  Nested structures (environments, packages)
+        # are still shared with ``self._data_cache`` and must not be
+        # mutated by the upstream helper.
+        payload = dict(self._data)
+        payload["version"] = 6
+        return _rattler_lock_v6_to_env(name=name, platform=platform, **payload)
 
 
 def _build_lockfile_dict(
@@ -65,6 +203,8 @@ def _build_lockfile_dict(
 
     *channels_by_env* maps environment names to ordered channel URLs.
     """
+    from conda_lockfiles.rattler_lock.v6 import _record_to_dict
+
     seen_urls: set[str] = set()
     packages: list[dict[str, Any]] = []
     envs_dict: dict[str, dict[str, Any]] = {}
@@ -189,77 +329,37 @@ def generate_lockfile(
     return path
 
 
-def _read_lockfile_data(ctx: WorkspaceContext) -> dict[str, Any]:
-    """Parse ``conda.lock`` and return the raw dict."""
-    path = lockfile_path(ctx)
-    if not path.is_file():
-        raise LockfileNotFoundError("(all)", path)
-    with path.open(encoding="utf-8") as fh:
-        return yaml_load(fh)
-
-
-def _extract_env_packages(
-    data: dict[str, Any],
-    env_name: str,
-    platform: str,
-) -> list[tuple[str, dict[str, Any]]]:
-    """Return ``(url, metadata)`` pairs for an env+platform from lockfile data.
-
-    Raises ``LockfileNotFoundError`` if the environment or platform is
-    missing.
-    """
-    environments = data.get("environments", {})
-    if env_name not in environments:
-        raise LockfileNotFoundError(
-            env_name,
-            Path(LOCKFILE_NAME),
-        )
-
-    env_data = environments[env_name]
-    platform_pkgs = env_data.get("packages", {}).get(platform)
-    if platform_pkgs is None:
-        raise LockfileNotFoundError(
-            env_name,
-            Path(LOCKFILE_NAME),
-        )
-
-    # Build a lookup from the top-level packages list
-    all_packages = data.get("packages", [])
-    lookup: dict[str, dict[str, Any]] = {}
-    for pkg in all_packages:
-        url = pkg.get("conda")
-        if url:
-            lookup[url] = pkg
-
-    # Match platform references against the packages list
-    result: list[tuple[str, dict[str, Any]]] = []
-    for ref in platform_pkgs:
-        url = ref.get("conda", "")
-        metadata = lookup.get(url, {})
-        result.append((url, metadata))
-
-    return result
-
-
 def install_from_lockfile(ctx: WorkspaceContext, env_name: str) -> None:
     """Install an environment from ``conda.lock``.
 
-    Reads the lockfile, extracts the package list for *env_name* on
-    the current platform, downloads the exact packages, and installs
-    them into the environment prefix — bypassing the solver entirely.
+    Reads the lockfile via :class:`CondaLockLoader`, extracts the
+    package list for *env_name* on the current platform, downloads the
+    exact packages, and installs them into the environment prefix —
+    bypassing the solver entirely.
 
-    Raises ``LockfileNotFoundError`` if the lockfile is missing or
-    does not contain the requested environment/platform.
+    Raises ``LockfileNotFoundError`` if the lockfile is missing or does
+    not contain the requested environment/platform.
     """
     from conda.misc import (
         get_package_records_from_explicit,
         install_explicit_packages,
     )
 
-    data = _read_lockfile_data(ctx)
-    pkg_pairs = _extract_env_packages(data, env_name, ctx.platform)
+    path = lockfile_path(ctx)
+    if not path.is_file():
+        raise LockfileNotFoundError("(all)", path)
 
-    urls = [url for url, _meta in pkg_pairs]
+    loader = CondaLockLoader(path)
+    try:
+        env_data = loader._env_data(env_name)
+    except (ValueError, OSError) as exc:
+        raise LockfileNotFoundError(env_name, path) from exc
+
+    platform_pkgs = env_data.get("packages", {}).get(ctx.platform)
+    if platform_pkgs is None:
+        raise LockfileNotFoundError(env_name, path)
+
+    urls = [ref["conda"] for ref in platform_pkgs if "conda" in ref]
 
     prefix = ctx.env_prefix(env_name)
     prefix.mkdir(parents=True, exist_ok=True)

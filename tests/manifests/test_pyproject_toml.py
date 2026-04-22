@@ -1,4 +1,4 @@
-"""Tests for conda_workspaces.parsers.pyproject_toml."""
+"""Tests for conda_workspaces.manifests.pyproject_toml."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from conda_workspaces.exceptions import WorkspaceParseError
-from conda_workspaces.parsers.pyproject_toml import PyprojectTomlParser
+from conda_workspaces.manifests.pyproject_toml import PyprojectTomlParser
 
 
 @pytest.fixture
