@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 from conda_workspaces.cli.task.remove import execute_remove
 from conda_workspaces.exceptions import TaskNotFoundError
-from conda_workspaces.parsers.toml import CondaTomlParser
+from conda_workspaces.manifests.toml import CondaTomlParser
 
 
 def _remove_args(

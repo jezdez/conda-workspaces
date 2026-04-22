@@ -11,7 +11,7 @@ from conda_workspaces.exceptions import (
     WorkspaceNotFoundError,
     WorkspaceParseError,
 )
-from conda_workspaces.parsers import (
+from conda_workspaces.manifests import (
     _cached_parse,
     detect_and_parse,
     detect_and_parse_tasks,
@@ -19,9 +19,9 @@ from conda_workspaces.parsers import (
     detect_workspace_file,
     find_parser,
 )
-from conda_workspaces.parsers.pixi_toml import PixiTomlParser
-from conda_workspaces.parsers.pyproject_toml import PyprojectTomlParser
-from conda_workspaces.parsers.toml import CondaTomlParser
+from conda_workspaces.manifests.pixi_toml import PixiTomlParser
+from conda_workspaces.manifests.pyproject_toml import PyprojectTomlParser
+from conda_workspaces.manifests.toml import CondaTomlParser
 
 
 @pytest.mark.parametrize(

@@ -8,8 +8,8 @@ from conda.exceptions import CondaSystemExit, DryRunExit
 from conda.reporters import confirm_yn
 from rich.console import Console
 
-from ...parsers import detect_and_parse_tasks
-from ...parsers.toml import tasks_to_toml
+from ...manifests import detect_and_parse_tasks
+from ...manifests.toml import tasks_to_toml
 
 if TYPE_CHECKING:
     import argparse

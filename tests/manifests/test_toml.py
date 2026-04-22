@@ -1,4 +1,4 @@
-"""Tests for conda_workspaces.parsers.toml (conda.toml parser and helpers)."""
+"""Tests for conda_workspaces.manifests.toml (conda.toml parser and helpers)."""
 
 from __future__ import annotations
 
@@ -7,8 +7,7 @@ from pathlib import Path
 import pytest
 
 from conda_workspaces.exceptions import WorkspaceParseError
-from conda_workspaces.models import Feature, MatchSpec
-from conda_workspaces.parsers.toml import (
+from conda_workspaces.manifests.toml import (
     CondaTomlParser,
     _parse_channels,
     _parse_conda_deps,
@@ -16,6 +15,7 @@ from conda_workspaces.parsers.toml import (
     _parse_pypi_deps,
     _parse_target_overrides,
 )
+from conda_workspaces.models import Feature, MatchSpec
 
 
 @pytest.mark.parametrize(

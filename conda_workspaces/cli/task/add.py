@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING
 
 from rich.console import Console
 
+from ...manifests import detect_task_file, find_parser
+from ...manifests.toml import CondaTomlParser
 from ...models import Task, TaskDependency
-from ...parsers import detect_task_file, find_parser
-from ...parsers.toml import CondaTomlParser
 
 if TYPE_CHECKING:
     import argparse

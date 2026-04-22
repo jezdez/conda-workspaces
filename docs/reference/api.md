@@ -4,7 +4,7 @@
 :hidden:
 
 api/models
-api/parsers
+api/manifests
 api/resolver
 api/context
 api/environments
@@ -22,8 +22,8 @@ Workspace configuration, task definitions, features, environments,
 dependencies, and channels.
 :::
 
-:::{grid-item-card} Parsers
-:link: api/parsers
+:::{grid-item-card} Manifests
+:link: api/manifests
 :link-type: doc
 
 File format parsers, detection logic, and the parser registry.

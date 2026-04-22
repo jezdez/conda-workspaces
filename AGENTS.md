@@ -20,12 +20,16 @@
   `cache.py` (task output caching), `context.py` (workspace context
   and template context for tasks).
 
-- Parser implementations use submodules, not subpackages. Each file
+- Manifest parser implementations live under `manifests/` (the
+  directory is named after its subject, not the verb). Each file
   format has a single parser that handles both workspace and task
-  parsing: `parsers/toml.py` (conda.toml), `parsers/pixi_toml.py`
-  (pixi.toml), `parsers/pyproject_toml.py` (pyproject.toml). Shared
-  task normalization: `parsers/normalize.py`. Base class:
-  `parsers/base.py` (`ManifestParser`).
+  parsing: `manifests/toml.py` (conda.toml), `manifests/pixi_toml.py`
+  (pixi.toml), `manifests/pyproject_toml.py` (pyproject.toml). Shared
+  task normalization: `manifests/normalize.py`. Base class:
+  `manifests/base.py` (`ManifestParser`). The `manifests/` package is
+  an internal substrate; public plugin API surfaces (`env_spec.py`,
+  `lockfile.py`, `env_export.py`) sit at the package root and own one
+  format each.
 
 - Tests mirror the source structure. Tests for
   `conda_workspaces/cli/workspace/install.py` live in
@@ -39,7 +43,7 @@
 - Use relative imports for all intra-package references
   (`from .models import WorkspaceConfig`,
   `from ..exceptions import CondaWorkspacesError`,
-  `from ...parsers import detect_and_parse_tasks`).
+  `from ...manifests import detect_and_parse_tasks`).
   Absolute `conda_workspaces.*` imports should only appear in tests
   and entry points.
 
@@ -55,7 +59,7 @@
   `template.py` where `_get_jinja_env()` lazily imports jinja2,
   `cli/task/run.py` where workspace context is lazily imported for
   environment resolution (tasks work without a workspace),
-  `parsers/toml.py` where `CondaTomlParser.parse()` delegates to
+  `manifests/toml.py` where `CondaTomlParser.parse()` delegates to
   `PixiTomlParser` (breaks a real circular dependency since
   `pixi_toml` imports helpers from `toml`),
   `cli/workspace/shell.py` where `conda_spawn` is an optional
@@ -219,6 +223,27 @@
   viewports.
 
 - The API reference is split into focused sub-pages by concern (models,
-  parsers, resolver, context, environments, tasks) rather than a single
-  monolithic page. The index uses `sphinx-design` grid cards for
-  navigation.
+  manifests, resolver, context, environments, tasks) rather than a
+  single monolithic page. The index uses `sphinx-design` grid cards
+  for navigation.
+
+## Plugin design
+
+- Each public plugin module at the package root owns exactly one
+  format and exposes its metadata as module-level `Final` constants
+  (`FORMAT`, `ALIASES`, `DEFAULT_FILENAMES`). `plugin.py` imports those
+  constants; it does not duplicate them. The canonical `FORMAT` name
+  is versioned when the on-disk schema has a version byte
+  (`conda-workspaces-lock-v1`); unversioned short forms live in
+  `ALIASES` so that users can type the convenient name while the
+  versioned name stays stable across future schema bumps. See
+  `docs/reference/format-aliases.md`.
+
+- When an upstream plugin/loader we depend on already owns a schema,
+  build a sibling loader that shares its validation + converters
+  rather than re-implementing parsing. `CondaLockLoader` in
+  `lockfile.py` is the canonical example: `conda.lock` is a
+  derivative of rattler-lock v6 (`pixi.lock`), so the loader composes
+  `conda_lockfiles.rattler_lock.v6`'s conversion helper via an
+  in-memory `version: 1 -> 6` swap instead of re-implementing YAML ->
+  `Environment` conversion.

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from conda.exceptions import CondaSystemExit
 
 from conda_workspaces.cli.task.export import execute_export
-from conda_workspaces.parsers.toml import CondaTomlParser
+from conda_workspaces.manifests.toml import CondaTomlParser
 
 if TYPE_CHECKING:
     from pathlib import Path

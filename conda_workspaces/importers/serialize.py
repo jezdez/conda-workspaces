@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING
 
 import tomlkit
 
+from ..manifests.toml import CondaTomlParser
 from ..models import Feature
-from ..parsers.toml import CondaTomlParser
 
 if TYPE_CHECKING:
     from ..models import Task, WorkspaceConfig

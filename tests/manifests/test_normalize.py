@@ -1,10 +1,10 @@
-"""Tests for conda_workspaces.parsers.normalize."""
+"""Tests for conda_workspaces.manifests.normalize."""
 
 from __future__ import annotations
 
 import pytest
 
-from conda_workspaces.parsers.normalize import (
+from conda_workspaces.manifests.normalize import (
     normalize_args,
     normalize_depends_on,
     normalize_override,

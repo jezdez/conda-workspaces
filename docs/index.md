@@ -162,7 +162,7 @@ Complete `conda workspace` and `conda task` command-line documentation.
 :link: reference/api
 :link-type: doc
 
-Python API for models, parsers, resolver, context, environments,
+Python API for models, manifests, resolver, context, environments,
 and task execution.
 :::
 

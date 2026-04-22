@@ -1,4 +1,4 @@
-"""Tests for task parsing in conda_workspaces.parsers.toml."""
+"""Tests for task parsing in conda_workspaces.manifests.toml."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from conda_workspaces.exceptions import TaskNotFoundError, TaskParseError
+from conda_workspaces.manifests.toml import CondaTomlParser, tasks_to_toml
 from conda_workspaces.models import Task, TaskArg, TaskDependency, TaskOverride
-from conda_workspaces.parsers.toml import CondaTomlParser, tasks_to_toml
 
 if TYPE_CHECKING:
     from pathlib import Path

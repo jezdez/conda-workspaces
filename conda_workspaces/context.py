@@ -30,7 +30,7 @@ class WorkspaceContext:
     def config(self) -> WorkspaceConfig:
         """The parsed workspace configuration."""
         if self._config is None:
-            from .parsers import detect_and_parse
+            from .manifests import detect_and_parse
 
             _, self._config = detect_and_parse()
         return self._config

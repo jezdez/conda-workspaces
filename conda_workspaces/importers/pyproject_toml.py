@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ..parsers import find_parser
+from ..manifests import find_parser
 from .base import ManifestImporter
 from .serialize import config_to_toml
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ...context import WorkspaceContext
-from ...parsers import detect_and_parse
+from ...manifests import detect_and_parse
 
 if TYPE_CHECKING:
     import argparse
