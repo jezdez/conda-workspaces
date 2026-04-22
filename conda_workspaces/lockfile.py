@@ -43,8 +43,6 @@ from typing import TYPE_CHECKING
 
 from conda.common.serialize.yaml import dump as yaml_dump
 from conda.plugins.types import EnvironmentSpecBase
-from conda_lockfiles.load_yaml import load_yaml
-from conda_lockfiles.rattler_lock.v6 import _record_to_dict
 
 from .exceptions import LockfileNotFoundError, SolveError
 
@@ -116,6 +114,8 @@ class CondaLockLoader(EnvironmentSpecBase):
     @property
     def _data(self) -> dict[str, Any]:
         if self._data_cache is None:
+            from conda_lockfiles.load_yaml import load_yaml
+
             self._data_cache = load_yaml(self.path)
         return self._data_cache
 
@@ -183,6 +183,10 @@ class CondaLockLoader(EnvironmentSpecBase):
         # not part of the public contract.
         from conda_lockfiles.rattler_lock.v6 import _rattler_lock_v6_to_env
 
+        # Shallow copy is sufficient: we only overwrite the top-level
+        # ``version`` key.  Nested structures (environments, packages)
+        # are still shared with ``self._data_cache`` and must not be
+        # mutated by the upstream helper.
         payload = dict(self._data)
         payload["version"] = 6
         return _rattler_lock_v6_to_env(name=name, platform=platform, **payload)
@@ -199,6 +203,8 @@ def _build_lockfile_dict(
 
     *channels_by_env* maps environment names to ordered channel URLs.
     """
+    from conda_lockfiles.rattler_lock.v6 import _record_to_dict
+
     seen_urls: set[str] = set()
     packages: list[dict[str, Any]] = []
     envs_dict: dict[str, dict[str, Any]] = {}
@@ -345,15 +351,10 @@ def install_from_lockfile(ctx: WorkspaceContext, env_name: str) -> None:
 
     loader = CondaLockLoader(path)
     try:
-        data = loader._data
-    except Exception as exc:
+        env_data = loader._env_data(env_name)
+    except (ValueError, OSError) as exc:
         raise LockfileNotFoundError(env_name, path) from exc
 
-    environments = data.get("environments", {})
-    if env_name not in environments:
-        raise LockfileNotFoundError(env_name, path)
-
-    env_data = environments[env_name]
     platform_pkgs = env_data.get("packages", {}).get(ctx.platform)
     if platform_pkgs is None:
         raise LockfileNotFoundError(env_name, path)

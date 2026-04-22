@@ -9,6 +9,8 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
+from conda_lockfiles.rattler_lock.v6 import _record_to_dict
+
 from conda_workspaces.context import WorkspaceContext
 from conda_workspaces.exceptions import LockfileNotFoundError
 from conda_workspaces.lockfile import (
@@ -19,7 +21,6 @@ from conda_workspaces.lockfile import (
     LOCKFILE_VERSION,
     CondaLockLoader,
     _build_lockfile_dict,
-    _record_to_dict,
     generate_lockfile,
     install_from_lockfile,
     lockfile_path,
@@ -97,7 +98,7 @@ def test_plugin_metadata() -> None:
 
 
 def test_record_to_dict() -> None:
-    """_record_to_dict (re-exported from conda-lockfiles) works unchanged."""
+    """``conda_lockfiles.rattler_lock.v6._record_to_dict`` works as expected."""
 
     class FakeRecord:
         url = "https://example.com/numpy-1.24.conda"
