@@ -279,34 +279,45 @@ def test_conda_lock_loader_env_uses_context_subdir(
     assert env.platform == context.subdir
 
 
-def test_conda_lock_loader_env_for_missing_platform(
+@pytest.mark.parametrize(
+    ("content", "env_for_kwargs", "match"),
+    [
+        (None, {"platform": "win-64"}, "does not list packages for platform"),
+        (
+            "version: 1\nenvironments:\n  test: {}\npackages: []\n",
+            {"platform": "linux-64", "name": "default"},
+            "not found in lockfile",
+        ),
+        (
+            "version: 99\nenvironments: {}\npackages: []\n",
+            {"platform": "linux-64"},
+            f"Unsupported {LOCKFILE_NAME} version",
+        ),
+    ],
+    ids=["missing-platform", "missing-environment", "wrong-version"],
+)
+def test_conda_lock_loader_env_for_errors(
+    tmp_path: Path,
     lockfile_with_platforms: Path,
+    content: str | None,
+    env_for_kwargs: dict,
+    match: str,
 ) -> None:
-    loader = CondaLockLoader(lockfile_with_platforms)
-    with pytest.raises(ValueError, match="does not list packages for platform"):
-        loader.env_for("win-64")
+    """``env_for`` raises ``ValueError`` for missing / malformed inputs.
 
+    ``content=None`` reuses ``lockfile_with_platforms`` (a realistic
+    multi-platform lockfile) so the missing-platform message can name
+    real alternatives.
+    """
+    if content is None:
+        path = lockfile_with_platforms
+    else:
+        path = tmp_path / LOCKFILE_NAME
+        path.write_text(content, encoding="utf-8")
 
-def test_conda_lock_loader_env_for_missing_environment(tmp_path: Path) -> None:
-    path = tmp_path / LOCKFILE_NAME
-    path.write_text(
-        "version: 1\nenvironments:\n  test: {}\npackages: []\n",
-        encoding="utf-8",
-    )
     loader = CondaLockLoader(path)
-    with pytest.raises(ValueError, match="not found in lockfile"):
-        loader.env_for("linux-64", name="default")
-
-
-def test_conda_lock_loader_env_wrong_version_raises(tmp_path: Path) -> None:
-    path = tmp_path / LOCKFILE_NAME
-    path.write_text(
-        "version: 99\nenvironments: {}\npackages: []\n",
-        encoding="utf-8",
-    )
-    loader = CondaLockLoader(path)
-    with pytest.raises(ValueError, match=f"Unsupported {LOCKFILE_NAME} version"):
-        loader.env_for("linux-64")
+    with pytest.raises(ValueError, match=match):
+        loader.env_for(**env_for_kwargs)
 
 
 def test_generate_lockfile(
@@ -382,29 +393,32 @@ def test_generate_lockfile_specific_envs(
     assert "default" in content
 
 
-def test_install_from_lockfile_missing(tmp_path: Path) -> None:
-    """install_from_lockfile raises LockfileNotFoundError when no conda.lock."""
-    ctx = _make_ctx(tmp_path)
-    with pytest.raises(LockfileNotFoundError):
-        install_from_lockfile(ctx, "default")
-
-
-def test_install_from_lockfile_missing_env(
-    tmp_path: Path, lockfile_content: str
+@pytest.mark.parametrize(
+    ("platform", "write_lockfile", "env_name", "match"),
+    [
+        ("linux-64", False, "default", None),
+        ("linux-64", True, "no-such-env", "no-such-env"),
+        ("win-64", True, "default", "default"),
+    ],
+    ids=["missing-file", "missing-env", "missing-platform"],
+)
+def test_install_from_lockfile_errors(
+    tmp_path: Path,
+    lockfile_content: str,
+    platform: str,
+    write_lockfile: bool,
+    env_name: str,
+    match: str | None,
 ) -> None:
-    ctx = _make_ctx(tmp_path)
-    (tmp_path / LOCKFILE_NAME).write_text(lockfile_content, encoding="utf-8")
-    with pytest.raises(LockfileNotFoundError, match="no-such-env"):
-        install_from_lockfile(ctx, "no-such-env")
+    """``install_from_lockfile`` raises ``LockfileNotFoundError`` for the
+    three failure modes: no file at all, wrong env name, wrong platform.
+    """
+    ctx = _make_ctx(tmp_path, platform=platform)
+    if write_lockfile:
+        (tmp_path / LOCKFILE_NAME).write_text(lockfile_content, encoding="utf-8")
 
-
-def test_install_from_lockfile_missing_platform(
-    tmp_path: Path, lockfile_content: str
-) -> None:
-    ctx = _make_ctx(tmp_path, platform="win-64")
-    (tmp_path / LOCKFILE_NAME).write_text(lockfile_content, encoding="utf-8")
-    with pytest.raises(LockfileNotFoundError, match="default"):
-        install_from_lockfile(ctx, "default")
+    with pytest.raises(LockfileNotFoundError, match=match):
+        install_from_lockfile(ctx, env_name)
 
 
 def test_install_from_lockfile(
