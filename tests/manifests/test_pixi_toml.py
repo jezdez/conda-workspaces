@@ -242,3 +242,43 @@ DEBUG = "1"
     dev = config.features["dev"]
     assert dev.activation_scripts == ["dev-setup.sh"]
     assert dev.activation_env == {"DEBUG": "1"}
+
+
+def test_parse_returns_plain_str_values(tmp_path):
+    """Names/platforms/feature names are plain ``str``, not tomlkit subclasses.
+
+    Regression guard for a lockfile-write failure: ``tomlkit.loads``
+    returns ``tomlkit.items.String`` instances (a ``str`` subclass).
+    YAML serialisation uses exact-type dispatch on dict keys, so any
+    ``tomlkit`` string that reaches ``env_export`` as a key (platform
+    or environment name) raises ``TypeError: Object of type String is
+    not YAML serializable``.  Normalising at the parser keeps
+    everything downstream oblivious to the TOML backend.
+    """
+    content = """\
+[workspace]
+name = "tomlkit-bleed"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64"]
+
+[dependencies]
+python = ">=3.10"
+
+[feature.gpu]
+platforms = ["linux-64"]
+
+[environments]
+cuda = ["gpu"]
+"""
+    path = tmp_path / "pixi.toml"
+    path.write_text(content, encoding="utf-8")
+    config = PixiTomlParser().parse(path)
+
+    for platform in config.platforms:
+        assert type(platform) is str, type(platform).__name__
+    for env_name in config.environments:
+        assert type(env_name) is str, type(env_name).__name__
+    for feat_name, feature in config.features.items():
+        assert type(feat_name) is str, type(feat_name).__name__
+        for platform in feature.platforms:
+            assert type(platform) is str, type(platform).__name__

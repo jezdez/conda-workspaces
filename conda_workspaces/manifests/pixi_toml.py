@@ -43,7 +43,13 @@ class PixiTomlParser(ManifestParser):
     def parse(self, path: Path) -> WorkspaceConfig:
         try:
             text = path.read_text(encoding="utf-8")
-            data = tomlkit.loads(text)
+            # ``unwrap()`` returns plain Python types; otherwise tomlkit
+            # subclasses (e.g. ``tomlkit.items.String``) leak through the
+            # data model and trip ruamel.yaml's exact-type key dispatch
+            # at lockfile write time.  Callers that need round-tripping
+            # (``conda workspace add/remove/init``) still work on the raw
+            # ``TOMLDocument`` separately.
+            data = tomlkit.loads(text).unwrap()
         except Exception as exc:
             raise WorkspaceParseError(path, str(exc)) from exc
 
