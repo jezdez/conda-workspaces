@@ -63,7 +63,7 @@ def lockfile_with_platforms(tmp_path: Path, lockfile_content: str) -> Path:
 
 
 @pytest.fixture
-def make_ctx(tmp_path: Path) -> Callable[..., WorkspaceContext]:
+def workspace_ctx_factory(tmp_path: Path) -> Callable[..., WorkspaceContext]:
     """Factory fixture that builds a ``WorkspaceContext`` rooted at tmp_path.
 
     Accepts ``platform`` (default ``"linux-64"``) and ``env_names``
@@ -94,9 +94,9 @@ def make_ctx(tmp_path: Path) -> Callable[..., WorkspaceContext]:
 
 
 def test_lockfile_path_returns_conda_lock(
-    tmp_path: Path, make_ctx: Callable[..., WorkspaceContext]
+    tmp_path: Path, workspace_ctx_factory: Callable[..., WorkspaceContext]
 ) -> None:
-    ctx = make_ctx()
+    ctx = workspace_ctx_factory()
     assert lockfile_path(ctx) == tmp_path / LOCKFILE_NAME
 
 
@@ -334,11 +334,11 @@ def test_conda_lock_loader_env_for_errors(
 
 def test_generate_lockfile(
     tmp_path: Path,
-    make_ctx: Callable[..., WorkspaceContext],
+    workspace_ctx_factory: Callable[..., WorkspaceContext],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """generate_lockfile solves and writes conda.lock."""
-    ctx = make_ctx(env_names=["default", "test"])
+    ctx = workspace_ctx_factory(env_names=["default", "test"])
 
     class FakePkg:
         def __init__(self, name: str, url: str):
@@ -382,11 +382,11 @@ def test_generate_lockfile(
 
 
 def test_generate_lockfile_specific_envs(
-    make_ctx: Callable[..., WorkspaceContext],
+    workspace_ctx_factory: Callable[..., WorkspaceContext],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """generate_lockfile with only one env generates only for that env."""
-    ctx = make_ctx(env_names=["default", "test"])
+    ctx = workspace_ctx_factory(env_names=["default", "test"])
 
     monkeypatch.setattr(
         "conda_workspaces.lockfile._solve_for_records",
@@ -417,7 +417,7 @@ def test_generate_lockfile_specific_envs(
 )
 def test_install_from_lockfile_errors(
     tmp_path: Path,
-    make_ctx: Callable[..., WorkspaceContext],
+    workspace_ctx_factory: Callable[..., WorkspaceContext],
     lockfile_content: str,
     platform: str,
     write_lockfile: bool,
@@ -427,7 +427,7 @@ def test_install_from_lockfile_errors(
     """``install_from_lockfile`` raises ``LockfileNotFoundError`` for the
     three failure modes: no file at all, wrong env name, wrong platform.
     """
-    ctx = make_ctx(platform=platform)
+    ctx = workspace_ctx_factory(platform=platform)
     if write_lockfile:
         (tmp_path / LOCKFILE_NAME).write_text(lockfile_content, encoding="utf-8")
 
@@ -437,11 +437,11 @@ def test_install_from_lockfile_errors(
 
 def test_install_from_lockfile(
     tmp_path: Path,
-    make_ctx: Callable[..., WorkspaceContext],
+    workspace_ctx_factory: Callable[..., WorkspaceContext],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """install_from_lockfile reads conda.lock, extracts URLs, and installs."""
-    ctx = make_ctx()
+    ctx = workspace_ctx_factory()
 
     lockfile = tmp_path / LOCKFILE_NAME
     lockfile.write_text(
