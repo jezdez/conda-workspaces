@@ -40,7 +40,6 @@ exact URLs, bypassing the solver entirely.
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -217,6 +216,7 @@ def _solve_for_records(
     to flow through the normal code paths.
     """
     from conda.base.context import context as conda_context
+    from conda.common.io import captured
     from conda.exceptions import UnsatisfiableError
     from conda.models.match_spec import MatchSpec
 
@@ -244,9 +244,18 @@ def _solve_for_records(
     prefix = str(ctx.env_prefix(resolved.name))
     subdirs = (platform, "noarch")
 
+    # The solver unconditionally prints ``Collecting package metadata``
+    # and ``Solving environment`` status lines through conda's reporter
+    # plugin (even when ``context.quiet`` is set — ``QuietSpinner``
+    # still writes to stdout).  Route stdout and stderr through
+    # ``conda.common.io.captured`` so the Rich progress rendered by
+    # the caller is the only thing the user sees.  Any captured output
+    # is discarded; diagnostics survive via ``SolveError(str(exc))``.
     with (
         _channel_priority_override(resolved.channel_priority),
         conda_context._override("_subdir", platform),
+        conda_context._override("quiet", True),
+        captured(),
     ):
         solver = solver_backend(
             prefix,
@@ -277,9 +286,10 @@ def generate_lockfile(
     results to ``<workspace>/conda.lock``.  Serialisation is delegated
     to :func:`.env_export.multiplatform_export` so this function and
     ``conda export --format=conda-workspaces-lock-v1`` produce
-    byte-identical output.  Solver stdout is silenced to avoid noise;
-    the caller is expected to render status itself via the optional
-    *progress* callback.
+    byte-identical output.  Solver chatter is silenced inside
+    :func:`_solve_for_records` itself, so the caller is free to render
+    status through the optional *progress* callback without stdout
+    bookkeeping.
 
     Fails fast by default: the first unsolvable ``(environment,
     platform)`` pair raises :class:`SolveError` with the platform
@@ -292,7 +302,6 @@ def generate_lockfile(
 
     Returns the path to the generated lockfile.
     """
-    from conda.base.context import context as conda_context
     from conda.models.environment import Environment, EnvironmentConfig
 
     from .env_export import multiplatform_export
@@ -301,54 +310,35 @@ def generate_lockfile(
     envs: list[Environment] = []
     failures: list[SolveError] = []
 
-    with conda_context._override("quiet", True):
-        real_stdout = sys.stdout
-        devnull = open(os.devnull, "w")
-        try:
-            sys.stdout = devnull
-            for name, resolved in resolved_envs.items():
-                # Intersect declared platforms with the requested subset.
-                # ``requested=None`` means "lock everything the env declares";
-                # an env with no declared platforms falls back to the host.
-                declared = set(resolved.platforms or [host_platform])
-                targets = sorted(
-                    declared if platforms is None else declared & set(platforms)
+    for name, resolved in resolved_envs.items():
+        # Intersect declared platforms with the requested subset.
+        # ``requested=None`` means "lock everything the env declares";
+        # an env with no declared platforms falls back to the host.
+        declared = set(resolved.platforms or [host_platform])
+        targets = sorted(declared if platforms is None else declared & set(platforms))
+        if not targets:
+            continue
+        channels = tuple(str(ch) for ch in resolved.channels)
+        for target in targets:
+            if progress is not None:
+                progress(name, target)
+            try:
+                records = _solve_for_records(ctx, resolved, target)
+            except SolveError as exc:
+                if not skip_unsolvable:
+                    raise
+                failures.append(exc)
+                if on_skip is not None:
+                    on_skip(name, target, exc)
+                continue
+            envs.append(
+                Environment(
+                    name=name,
+                    platform=target,
+                    config=EnvironmentConfig(channels=channels),
+                    explicit_packages=records,
                 )
-                if not targets:
-                    continue
-                channels = tuple(str(ch) for ch in resolved.channels)
-                for target in targets:
-                    if progress is not None:
-                        # Render outside the devnull stdout redirection.
-                        sys.stdout = real_stdout
-                        try:
-                            progress(name, target)
-                        finally:
-                            sys.stdout = devnull
-                    try:
-                        records = _solve_for_records(ctx, resolved, target)
-                    except SolveError as exc:
-                        if not skip_unsolvable:
-                            raise
-                        failures.append(exc)
-                        if on_skip is not None:
-                            sys.stdout = real_stdout
-                            try:
-                                on_skip(name, target, exc)
-                            finally:
-                                sys.stdout = devnull
-                        continue
-                    envs.append(
-                        Environment(
-                            name=name,
-                            platform=target,
-                            config=EnvironmentConfig(channels=channels),
-                            explicit_packages=records,
-                        )
-                    )
-        finally:
-            sys.stdout = real_stdout
-            devnull.close()
+            )
 
     if failures and not envs:
         raise AllTargetsUnsolvableError(failures)
