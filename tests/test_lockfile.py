@@ -13,10 +13,15 @@ if TYPE_CHECKING:
 
 from conda.base.context import context as conda_context
 from conda.models.match_spec import MatchSpec
+from conda_lockfiles.load_yaml import load_yaml
 from conda_lockfiles.rattler_lock.v6 import _record_to_dict
 
 from conda_workspaces.context import WorkspaceContext
-from conda_workspaces.exceptions import LockfileNotFoundError, SolveError
+from conda_workspaces.exceptions import (
+    LockfileMergeError,
+    LockfileNotFoundError,
+    SolveError,
+)
 from conda_workspaces.lockfile import (
     ALIASES,
     DEFAULT_FILENAMES,
@@ -27,6 +32,7 @@ from conda_workspaces.lockfile import (
     generate_lockfile,
     install_from_lockfile,
     lockfile_path,
+    merge_lockfiles,
 )
 from conda_workspaces.models import Channel, Environment, Feature, WorkspaceConfig
 from conda_workspaces.resolver import ResolvedEnvironment
@@ -735,3 +741,143 @@ def test_solve_for_platform_virtual_package_env(
     # After the solve, any baseline the context manager applied must
     # have been restored — nothing leaks into the surrounding process.
     assert os.environ.get("CONDA_OVERRIDE_GLIBC") is None
+
+
+@pytest.fixture
+def write_fragment() -> Callable[[WorkspaceContext, dict, str], Path]:
+    """Factory that solves one platform into a ``conda.lock.<platform>`` fragment.
+
+    ``conda_lockfiles.load_yaml`` caches parsed YAML by path; fragment
+    files are rewritten between calls in the merge tests, so the
+    factory evicts the cache after every write to keep subsequent
+    reads fresh.
+    """
+
+    def _factory(ctx: WorkspaceContext, resolved_envs, platform: str) -> Path:
+        target = ctx.root / f"conda.lock.{platform}"
+        generate_lockfile(
+            ctx,
+            resolved_envs,
+            platforms=(platform,),
+            output_path=target,
+        )
+        load_yaml.cache_clear()
+        return target
+
+    return _factory
+
+
+def test_merge_lockfiles_byte_stable_with_single_run(
+    workspace_ctx_factory: Callable[..., WorkspaceContext],
+    fake_solver_factory,
+    resolved_envs_factory,
+    write_fragment: Callable[[WorkspaceContext, dict, str], Path],
+) -> None:
+    """Merging per-platform fragments must match a single-run lockfile byte-for-byte."""
+    ctx_single = workspace_ctx_factory(env_names=["default", "test"])
+    fake_solver_factory()
+    resolved_envs = resolved_envs_factory(
+        default=["linux-64", "osx-arm64"],
+        test=["linux-64", "osx-arm64"],
+    )
+    single_path = generate_lockfile(ctx_single, resolved_envs)
+    single_content = single_path.read_text(encoding="utf-8")
+
+    ctx_split = workspace_ctx_factory(env_names=["default", "test"])
+    fake_solver_factory()
+    resolved_envs_split = resolved_envs_factory(
+        default=["linux-64", "osx-arm64"],
+        test=["linux-64", "osx-arm64"],
+    )
+    frag_linux = write_fragment(ctx_split, resolved_envs_split, "linux-64")
+    frag_osx = write_fragment(ctx_split, resolved_envs_split, "osx-arm64")
+
+    # Delete any lockfile left behind by the fragment solves so the
+    # merge writes into a clean slate.
+    merged_path = lockfile_path(ctx_split)
+    if merged_path.exists():
+        merged_path.unlink()
+
+    result = merge_lockfiles([frag_linux, frag_osx], ctx_split)
+    assert result == merged_path
+    assert merged_path.read_text(encoding="utf-8") == single_content
+
+
+def test_merge_lockfiles_rejects_empty_input(
+    workspace_ctx_factory: Callable[..., WorkspaceContext],
+) -> None:
+    """An empty fragment list is a user error."""
+    ctx = workspace_ctx_factory()
+    with pytest.raises(LockfileMergeError, match="no lockfile fragments"):
+        merge_lockfiles([], ctx)
+
+
+def test_merge_lockfiles_missing_file(
+    tmp_path: Path,
+    workspace_ctx_factory: Callable[..., WorkspaceContext],
+) -> None:
+    ctx = workspace_ctx_factory()
+    with pytest.raises(LockfileMergeError, match="does not exist"):
+        merge_lockfiles([tmp_path / "missing.lock"], ctx)
+
+
+def test_merge_lockfiles_rejects_wrong_version(
+    tmp_path: Path,
+    workspace_ctx_factory: Callable[..., WorkspaceContext],
+) -> None:
+    ctx = workspace_ctx_factory()
+    bad = tmp_path / "conda.lock.bad"
+    bad.write_text(
+        "version: 99\nenvironments: {}\npackages: []\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(LockfileMergeError, match="version"):
+        merge_lockfiles([bad], ctx)
+
+
+def test_merge_lockfiles_channel_mismatch(
+    workspace_ctx_factory: Callable[..., WorkspaceContext],
+    fake_solver_factory,
+    resolved_envs_factory,
+    write_fragment: Callable[[WorkspaceContext, dict, str], Path],
+) -> None:
+    ctx = workspace_ctx_factory(env_names=["default"])
+    fake_solver_factory()
+    resolved_envs = resolved_envs_factory(default=["linux-64"])
+    frag_a = write_fragment(ctx, resolved_envs, "linux-64")
+
+    # Produce a second fragment with a different channel list by
+    # tweaking the saved content directly.
+    frag_b = ctx.root / "conda.lock.osx-arm64"
+    content = (
+        frag_a.read_text(encoding="utf-8")
+        .replace("linux-64", "osx-arm64")
+        .replace(
+            "conda-forge",
+            "different-channel",
+        )
+    )
+    frag_b.write_text(content, encoding="utf-8")
+    load_yaml.cache_clear()
+
+    with pytest.raises(LockfileMergeError, match="channels differ"):
+        merge_lockfiles([frag_a, frag_b], ctx)
+
+
+def test_merge_lockfiles_duplicate_platform(
+    workspace_ctx_factory: Callable[..., WorkspaceContext],
+    fake_solver_factory,
+    resolved_envs_factory,
+    write_fragment: Callable[[WorkspaceContext, dict, str], Path],
+) -> None:
+    ctx = workspace_ctx_factory(env_names=["default"])
+    fake_solver_factory()
+    resolved_envs = resolved_envs_factory(default=["linux-64"])
+    frag_a = write_fragment(ctx, resolved_envs, "linux-64")
+
+    frag_b = ctx.root / "conda.lock.linux-64.dup"
+    frag_b.write_text(frag_a.read_text(encoding="utf-8"), encoding="utf-8")
+    load_yaml.cache_clear()
+
+    with pytest.raises(LockfileMergeError, match="present in both"):
+        merge_lockfiles([frag_a, frag_b], ctx)

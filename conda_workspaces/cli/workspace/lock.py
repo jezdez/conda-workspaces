@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+from conda.exceptions import CondaValueError
 from rich.console import Console
 
 from ...exceptions import EnvironmentNotFoundError, PlatformError
-from ...lockfile import generate_lockfile
+from ...lockfile import generate_lockfile, merge_lockfiles
 from ...resolver import known_platforms, resolve_all_environments, resolve_environment
 from . import workspace_context_from_args
 
@@ -26,6 +28,52 @@ def execute_lock(args: argparse.Namespace, *, console: Console | None = None) ->
     env_name = getattr(args, "environment", None)
     requested_platforms: list[str] | None = getattr(args, "platform", None) or None
     skip_unsolvable: bool = bool(getattr(args, "skip_unsolvable", False))
+    merge_patterns: list[str] | None = getattr(args, "merge", None) or None
+    output_path: Path | None = getattr(args, "output", None)
+
+    if merge_patterns:
+        if env_name or requested_platforms or skip_unsolvable or output_path:
+            raise CondaValueError(
+                "--merge cannot be combined with --environment, --platform,"
+                " --skip-unsolvable, or --output."
+            )
+        # Expand --merge values (plain paths or glob patterns) relative
+        # to the current working directory, deduplicating while
+        # preserving first-seen order so the merged output stays stable
+        # when a user passes overlapping globs.
+        cwd = Path.cwd()
+        fragments: list[Path] = []
+        seen: set[Path] = set()
+        for pattern in merge_patterns:
+            raw = Path(pattern)
+            if any(ch in pattern for ch in "*?["):
+                if raw.is_absolute():
+                    anchor = Path(raw.anchor)
+                    matches = sorted(anchor.glob(str(raw.relative_to(raw.anchor))))
+                else:
+                    matches = sorted(cwd.glob(pattern))
+            else:
+                matches = [raw if raw.is_absolute() else cwd / raw]
+            for match in matches:
+                resolved = match.resolve()
+                if resolved not in seen:
+                    seen.add(resolved)
+                    fragments.append(match)
+        if not fragments:
+            raise CondaValueError(
+                "--merge matched no files; check the pattern and try again."
+            )
+        console.print(
+            "[bold blue]Merging[/bold blue]"
+            f" [bold]{len(fragments)}[/bold] lockfile fragment"
+            f"{'s' if len(fragments) != 1 else ''}"
+            "[dim]...[/dim]"
+        )
+        for fragment in fragments:
+            console.print(f"  [dim]<-[/dim] {fragment}")
+        merge_lockfiles(fragments, ctx)
+        console.print("[bold cyan]Updated[/bold cyan] [bold]conda.lock[/bold]")
+        return 0
 
     if env_name:
         if env_name not in config.environments:
@@ -62,8 +110,9 @@ def execute_lock(args: argparse.Namespace, *, console: Console | None = None) ->
             f" on [bold]{platform}[/bold][dim]:[/dim] {exc.reason}"
         )
 
+    updating_label = output_path.name if output_path is not None else "conda.lock"
     console.print(
-        "[bold blue]Updating[/bold blue] [bold]conda.lock[/bold][dim]...[/dim]"
+        f"[bold blue]Updating[/bold blue] [bold]{updating_label}[/bold][dim]...[/dim]"
     )
     generate_lockfile(
         ctx,
@@ -72,7 +121,9 @@ def execute_lock(args: argparse.Namespace, *, console: Console | None = None) ->
         progress=_progress,
         skip_unsolvable=skip_unsolvable,
         on_skip=_on_skip if skip_unsolvable else None,
+        output_path=output_path,
     )
-    console.print("[bold cyan]Updated[/bold cyan] [bold]conda.lock[/bold]")
+    target_label = output_path.name if output_path is not None else "conda.lock"
+    console.print(f"[bold cyan]Updated[/bold cyan] [bold]{target_label}[/bold]")
 
     return 0

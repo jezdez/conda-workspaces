@@ -455,6 +455,35 @@ relative to the manifest — if the manifest has changed since the lockfile
 was generated, the install fails. Use `--frozen` to skip freshness
 checks entirely and install the lockfile as-is.
 
+### CI-split locking with `--merge`
+
+Solving every platform in one job becomes expensive as a workspace
+grows. `conda workspace lock` supports matrix pipelines that split
+solving across runners and stitch the fragments back together on a
+coordinator job:
+
+```bash
+# In a matrix job, per platform
+conda workspace lock --platform linux-64 --output conda.lock.linux-64
+conda workspace lock --platform osx-arm64 --output conda.lock.osx-arm64
+conda workspace lock --platform win-64 --output conda.lock.win-64
+
+# On the coordinator — no solver runs, fragments are combined in place
+conda workspace lock --merge "conda.lock.*"
+```
+
+`--output` writes the solved lockfile to the given path instead of the
+default `<workspace>/conda.lock`. It may be combined with `--platform`
+so each matrix runner emits exactly one `(env, platform)` slice.
+
+`--merge` loads every fragment, validates that they agree on schema
+version and on each shared environment's channel list, and rejects
+overlapping `(environment, platform)` pairs. On success the merged
+`conda.lock` is byte-stable with what a single-run
+`conda workspace lock` would produce for the same inputs. `--merge`
+is mutually exclusive with `--environment`, `--platform`,
+`--skip-unsolvable`, and `--output`.
+
 You can also point to a specific manifest with `--file` / `-f`:
 
 ```bash
