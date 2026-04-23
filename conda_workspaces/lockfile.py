@@ -46,10 +46,15 @@ from typing import TYPE_CHECKING
 
 from conda.plugins.types import EnvironmentSpecBase
 
-from .exceptions import AllTargetsUnsolvableError, LockfileNotFoundError, SolveError
+from .exceptions import (
+    AllTargetsUnsolvableError,
+    LockfileMergeError,
+    LockfileNotFoundError,
+    SolveError,
+)
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Iterable, Sequence
     from typing import Any, ClassVar, Final
 
     from conda.common.path import PathType
@@ -161,7 +166,13 @@ class CondaLockLoader(EnvironmentSpecBase):
 
         payload = dict(self._data)
         payload["version"] = 6
-        return _rattler_lock_v6_to_env(name=name, platform=platform, **payload)
+        env = _rattler_lock_v6_to_env(name=name, platform=platform, **payload)
+        # The rattler v6 helper does not populate ``Environment.name``
+        # on the returned object; re-exporters like
+        # :func:`.export.multiplatform_export` rely on it to group
+        # platforms under the right environment key, so restore it.
+        env.name = name
+        return env
 
     @property
     def env(self) -> Environment:
@@ -260,6 +271,7 @@ def generate_lockfile(
     progress: Callable[[str, str], None] | None = None,
     skip_unsolvable: bool = False,
     on_skip: Callable[[str, str, SolveError], None] | None = None,
+    output_path: Path | None = None,
 ) -> Path:
     """Generate a ``conda.lock`` by solving workspace environments.
 
@@ -281,6 +293,12 @@ def generate_lockfile(
     pairs; :class:`AllTargetsUnsolvableError` is raised only if every
     pair fails.  Non-solver errors (missing channel, invalid manifest,
     etc.) always abort.
+
+    When *output_path* is given, the lockfile is written there instead
+    of the default ``<workspace>/conda.lock``.  Matrix CI runners use
+    this to emit per-platform fragments
+    (e.g. ``conda.lock.linux-64``) that a coordinator job later stitches
+    back together with :func:`merge_lockfiles`.
 
     Returns the path to the generated lockfile.
     """
@@ -327,9 +345,158 @@ def generate_lockfile(
     if failures and not envs:
         raise AllTargetsUnsolvableError(failures)
 
-    path = lockfile_path(ctx)
+    path = output_path if output_path is not None else lockfile_path(ctx)
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(multiplatform_export(envs), encoding="utf-8")
     return path
+
+
+def merge_lockfiles(paths: Sequence[Path], ctx: WorkspaceContext) -> Path:
+    """Merge per-platform ``conda.lock`` fragments into a single lockfile.
+
+    Designed for CI matrix pipelines that split locking across runners:
+    each runner produces a fragment for one platform (typically via
+    ``conda workspace lock --platform <subdir> --output
+    conda.lock.<subdir>``), and a coordinator job stitches them back
+    into a single ``<workspace>/conda.lock`` with this function.
+
+    Every fragment must be a ``version: 1`` lockfile.  Fragments that
+    declare the same environment must agree on its ``channels`` list
+    entry-for-entry and in the same order.  Two fragments may not both
+    carry entries for the same ``(environment, platform)`` pair —
+    overlapping platforms indicate a misconfigured pipeline rather than
+    a legitimate merge.  Any violation raises
+    :class:`LockfileMergeError` and nothing is written.
+
+    The merge happens at the YAML layer — going through
+    :class:`CondaLockLoader` would force
+    :func:`conda_lockfiles.records_from_conda_urls.records_from_conda_urls`
+    to fetch every package to populate :class:`PackageRecord` objects,
+    which defeats the purpose of merging cached fragments.  We stitch
+    the dicts back together and hand them to conda's YAML dumper.
+
+    The output is byte-stable with a single-run
+    :func:`generate_lockfile` call over the same inputs: environments
+    are walked in first-seen order across fragments, platforms in
+    alphabetical order within each environment, and top-level
+    ``packages`` are emitted in the same order
+    :meth:`CondaLockLoader.compose` would produce (first encounter of
+    each URL wins, iterating env-by-env then platform-by-platform).
+
+    Returns the path to the merged lockfile.
+    """
+    import io
+
+    from conda.common.serialize.yaml import dump as yaml_dump
+
+    if not paths:
+        raise LockfileMergeError("no lockfile fragments were supplied")
+
+    merged = _compose_lockfile_dict(paths)
+
+    out_path = lockfile_path(ctx)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    buf = io.StringIO()
+    yaml_dump(merged, buf)
+    out_path.write_text(buf.getvalue(), encoding="utf-8")
+    return out_path
+
+
+def _compose_lockfile_dict(paths: Sequence[Path]) -> dict[str, Any]:
+    """Validate and fold every fragment in *paths* into a single lockfile dict.
+
+    Raises :class:`LockfileMergeError` on any validation failure.  The
+    returned dict shape matches what :meth:`CondaLockLoader.compose`
+    emits, guaranteeing byte-stable output once passed through the same
+    YAML dumper.
+    """
+    from conda_lockfiles.load_yaml import load_yaml
+
+    env_order: list[str] = []
+    env_channels: dict[str, list[dict[str, Any]]] = {}
+    env_platforms: dict[str, dict[str, list[dict[str, str]]]] = {}
+    seen_pairs: dict[tuple[str, str], Path] = {}
+    packages_by_url: dict[str, dict[str, Any]] = {}
+
+    for path in paths:
+        if not path.is_file():
+            raise LockfileMergeError(f"fragment '{path}' does not exist")
+        data = load_yaml(path)
+        version = data.get("version")
+        if version != LOCKFILE_VERSION:
+            raise LockfileMergeError(
+                f"fragment '{path}' has version {version!r}, "
+                f"expected {LOCKFILE_VERSION}"
+            )
+        for record in data.get("packages", []) or []:
+            url = record.get("url") or record.get("conda") or record.get("pypi")
+            if not url:
+                continue
+            packages_by_url.setdefault(url, record)
+
+        for env_name, env_data in (data.get("environments") or {}).items():
+            channels = list(env_data.get("channels") or [])
+            existing = env_channels.get(env_name)
+            if existing is None:
+                env_order.append(env_name)
+                env_channels[env_name] = channels
+                env_platforms[env_name] = {}
+            elif existing != channels:
+                raise LockfileMergeError(
+                    f"environment '{env_name}' channels differ between "
+                    f"fragments; '{path}' disagrees with an earlier fragment",
+                    hints=[
+                        "Every fragment must declare the same channel list"
+                        " (same entries, same order) for a shared environment.",
+                    ],
+                )
+            for platform, refs in (env_data.get("packages") or {}).items():
+                pair = (env_name, platform)
+                if pair in seen_pairs:
+                    raise LockfileMergeError(
+                        f"environment '{env_name}' on platform "
+                        f"'{platform}' is present in both "
+                        f"'{seen_pairs[pair]}' and '{path}'",
+                        hints=[
+                            "Each (environment, platform) pair must come"
+                            " from exactly one fragment.",
+                        ],
+                    )
+                seen_pairs[pair] = path
+                env_platforms[env_name][platform] = list(refs or [])
+
+    # Rebuild top-level ``packages`` in the same order
+    # :meth:`CondaLockLoader.compose` would produce for a single-run
+    # solve: iterate envs in first-seen order, platforms alphabetically,
+    # then each platform's refs (already sorted by package name by the
+    # producing fragment).  First occurrence of a URL wins.
+    merged_packages: list[dict[str, Any]] = []
+    emitted_urls: set[str] = set()
+    for env_name in env_order:
+        for platform in sorted(env_platforms[env_name]):
+            for ref in env_platforms[env_name][platform]:
+                url = ref.get("conda")
+                if not url or url in emitted_urls:
+                    continue
+                record = packages_by_url.get(url)
+                if record is not None:
+                    merged_packages.append(record)
+                    emitted_urls.add(url)
+
+    return {
+        "version": LOCKFILE_VERSION,
+        "environments": {
+            name: {
+                "channels": env_channels[name],
+                "packages": {
+                    platform: env_platforms[name][platform]
+                    for platform in sorted(env_platforms[name])
+                },
+            }
+            for name in env_order
+        },
+        "packages": merged_packages,
+    }
 
 
 def install_from_lockfile(ctx: WorkspaceContext, env_name: str) -> None:

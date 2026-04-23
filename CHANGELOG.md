@@ -8,36 +8,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
-- Cross-platform solves now seed conservative virtual package
-  baselines when the host cannot detect them, mirroring rattler's
-  `VirtualPackages::detect_for_platform`. Solving `linux-64` from
-  macOS (or any other non-native target) sets `CONDA_OVERRIDE_GLIBC`
-  to `2.17` for the duration of the solve; `osx-arm64` cross-compiles
-  get `CONDA_OVERRIDE_OSX=11.0`, `osx-64` gets `10.15`, and `win-*`
-  targets get `CONDA_OVERRIDE_WIN=0`. Native solves are unchanged.
-  Explicit `CONDA_OVERRIDE_*` values stay authoritative, and a
-  `[system-requirements]` entry for the same virtual package is
-  promoted into the baseline override so the spec and the record
-  agree on the version. `__cuda` and `__archspec` are never
-  auto-baselined — declare them in `[system-requirements]` or via
-  `CONDA_OVERRIDE_*` when you need them.
-- New `conda workspace export` command. Delegates to conda's
-  `conda_environment_exporters` plugin hook, so the built-in
-  `environment-yaml` / `environment-json` exporters, the
-  `conda-workspaces-lock-v1` exporter, and any third-party exporter
-  (e.g. `conda-lockfiles`' rattler-lock) are all reachable through
-  the same CLI — `conda workspace export --format ...` produces
-  byte-identical output to `conda export --format ...` for the same
-  `Environment`. Three sources feed the exporter: the declared
-  manifest (default, no solver or install required), `--from-lockfile`
-  (reads an existing `conda.lock` via `CondaLockLoader`), and
-  `--from-prefix` (mirrors `conda export` semantics including
-  `--no-builds`, `--ignore-channels`, `--from-history`). The format
-  is picked by `--format`, auto-detected from `--file`'s basename,
-  or falls back to `environment-yaml`. `--platform` (repeatable)
-  restricts the export and requires a `multiplatform_export`-capable
-  exporter when more than one platform is given. `--dry-run` prints
-  to stdout without writing; `--json` emits a structured result.
+- `conda workspace lock` gained `--output <path>` and `--merge <glob>`
+  for CI-split locking pipelines. `--output` writes the solved
+  lockfile to an arbitrary path (e.g. `conda.lock.linux-64`) instead
+  of the default `<workspace>/conda.lock`, so matrix runners can each
+  emit a per-platform fragment. `--merge` (repeatable, supports
+  globs) stitches fragments back into a single `conda.lock` without
+  running the solver. The merger validates schema version agreement,
+  per-environment channel-list equality, and rejects overlapping
+  `(environment, platform)` pairs; violations raise the new
+  `LockfileMergeError` and nothing is written. The merged output is
+  byte-stable with a single-run `conda workspace lock` over the same
+  inputs. `--merge` is mutually exclusive with `--environment`,
+  `--platform`, `--skip-unsolvable`, and `--output`.
 - `conda workspace lock` now writes a single `conda.lock` that covers
   every platform declared by each environment, not just the host
   platform. Target-platform solves run with `context._subdir`

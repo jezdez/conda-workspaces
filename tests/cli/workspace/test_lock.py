@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from conda.exceptions import CondaValueError
 
-from conda_workspaces.cli.workspace.lock import execute_lock
+from conda_workspaces.cli.workspace.lock import _expand_merge_paths, execute_lock
 from conda_workspaces.exceptions import EnvironmentNotFoundError, PlatformError
 
 from ..conftest import make_args
@@ -19,6 +20,8 @@ _DEFAULTS = {
     "environment": None,
     "platform": None,
     "skip_unsolvable": False,
+    "merge": None,
+    "output": None,
 }
 
 
@@ -41,6 +44,7 @@ def capture_generate_lockfile(monkeypatch: pytest.MonkeyPatch, pixi_workspace: P
         progress=None,
         skip_unsolvable=False,
         on_skip=None,
+        output_path=None,
     ):
         calls.append(
             {
@@ -49,9 +53,10 @@ def capture_generate_lockfile(monkeypatch: pytest.MonkeyPatch, pixi_workspace: P
                 "progress": progress,
                 "skip_unsolvable": skip_unsolvable,
                 "on_skip": on_skip,
+                "output_path": output_path,
             }
         )
-        return pixi_workspace / "conda.lock"
+        return output_path or (pixi_workspace / "conda.lock")
 
     monkeypatch.setattr(
         "conda_workspaces.cli.workspace.lock.generate_lockfile", fake_generate
@@ -149,3 +154,104 @@ def test_lock_forwards_skip_unsolvable(
         assert callable(capture_generate_lockfile[0]["on_skip"])
     else:
         assert capture_generate_lockfile[0]["on_skip"] is None
+
+
+def test_lock_forwards_output_path(
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capture_generate_lockfile: list[dict],
+) -> None:
+    """``--output`` threads through to ``generate_lockfile(output_path=...)``."""
+    monkeypatch.chdir(pixi_workspace)
+    target = pixi_workspace / "conda.lock.linux-64"
+
+    result = execute_lock(make_args(_DEFAULTS, output=target))
+    assert result == 0
+    assert capture_generate_lockfile[0]["output_path"] == target
+
+
+def test_lock_merge_dispatches_to_merge_lockfiles(
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capture_generate_lockfile: list[dict],
+) -> None:
+    """``--merge`` bypasses the solver and calls ``merge_lockfiles``."""
+    monkeypatch.chdir(pixi_workspace)
+    frag1 = pixi_workspace / "conda.lock.linux-64"
+    frag2 = pixi_workspace / "conda.lock.osx-arm64"
+    frag1.write_text("placeholder", encoding="utf-8")
+    frag2.write_text("placeholder", encoding="utf-8")
+
+    seen_paths: list[list] = []
+
+    def fake_merge(paths, ctx):
+        seen_paths.append(list(paths))
+        return pixi_workspace / "conda.lock"
+
+    monkeypatch.setattr(
+        "conda_workspaces.cli.workspace.lock.merge_lockfiles", fake_merge
+    )
+
+    result = execute_lock(
+        make_args(_DEFAULTS, merge=[str(frag1), str(frag2)]),
+    )
+    assert result == 0
+    assert capture_generate_lockfile == []
+    assert len(seen_paths) == 1
+    resolved = {p.resolve() for p in seen_paths[0]}
+    assert resolved == {frag1.resolve(), frag2.resolve()}
+
+
+def test_lock_merge_glob_expansion(
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``--merge 'conda.lock.*'`` globs fragments relative to cwd."""
+    monkeypatch.chdir(pixi_workspace)
+    (pixi_workspace / "conda.lock.linux-64").write_text("x", encoding="utf-8")
+    (pixi_workspace / "conda.lock.osx-arm64").write_text("x", encoding="utf-8")
+
+    paths = _expand_merge_paths(["conda.lock.*"])
+    names = sorted(p.name for p in paths)
+    assert names == ["conda.lock.linux-64", "conda.lock.osx-arm64"]
+
+
+@pytest.mark.parametrize(
+    "incompatible",
+    [
+        {"environment": "default"},
+        {"platform": ["linux-64"]},
+        {"skip_unsolvable": True},
+        {"output": "conda.lock.linux-64"},
+    ],
+    ids=["with-environment", "with-platform", "with-skip-unsolvable", "with-output"],
+)
+def test_lock_merge_rejects_incompatible_flags(
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    incompatible: dict,
+) -> None:
+    """``--merge`` is mutually exclusive with solver-side flags."""
+    from pathlib import Path
+
+    monkeypatch.chdir(pixi_workspace)
+    frag = pixi_workspace / "conda.lock.linux-64"
+    frag.write_text("placeholder", encoding="utf-8")
+    if "output" in incompatible:
+        incompatible = {"output": Path(str(incompatible["output"]))}
+
+    with pytest.raises(CondaValueError, match="--merge"):
+        execute_lock(
+            make_args(_DEFAULTS, merge=[str(frag)], **incompatible),
+        )
+
+
+def test_lock_merge_no_matches_raises(
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An empty glob match is a user error, not a silent no-op."""
+    monkeypatch.chdir(pixi_workspace)
+
+    with pytest.raises(CondaValueError, match="matched no files"):
+        execute_lock(make_args(_DEFAULTS, merge=["conda.lock.missing.*"]))

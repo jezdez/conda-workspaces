@@ -204,6 +204,29 @@ class LockfileNotFoundError(CondaWorkspacesError):
         )
 
 
+class LockfileMergeError(CondaWorkspacesError):
+    """A set of ``conda.lock`` fragments cannot be merged into one file.
+
+    Raised by :func:`conda_workspaces.lockfile.merge_lockfiles` when the
+    caller-provided fragments disagree on metadata (schema version,
+    channel list for a shared environment) or overlap on an
+    ``(environment, platform)`` pair that would otherwise be written
+    twice.  The *reason* attribute carries the human-readable detail.
+    """
+
+    def __init__(self, reason: str, *, hints: list[str] | None = None) -> None:
+        self.reason = reason
+        super().__init__(
+            f"Cannot merge lockfile fragments: {reason}",
+            hints=hints
+            or [
+                "Regenerate the offending fragment with `conda workspace"
+                " lock --platform <subdir> --output conda.lock.<subdir>`"
+                " and re-run the merge.",
+            ],
+        )
+
+
 class LockfileStaleError(CondaWorkspacesError):
     """The lockfile is older than the workspace manifest."""
 

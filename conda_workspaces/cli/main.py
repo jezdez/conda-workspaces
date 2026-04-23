@@ -160,6 +160,30 @@ def configure_workspace_parser(parser: argparse.ArgumentParser) -> None:
             " pair can be solved."
         ),
     )
+    lock_parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help=(
+            "Write the lockfile to this path instead of the default"
+            " <workspace>/conda.lock. Useful in CI matrices that emit"
+            " per-platform fragments (e.g. --platform linux-64 --output"
+            " conda.lock.linux-64) to be stitched back with --merge."
+        ),
+    )
+    lock_parser.add_argument(
+        "--merge",
+        action="append",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Merge pre-existing conda.lock fragments into a single"
+            " <workspace>/conda.lock without solving. May be passed"
+            " multiple times; each value is treated as a glob"
+            " (e.g. --merge 'conda.lock.*'). Cannot be combined with"
+            " --environment, --platform, --skip-unsolvable, or --output."
+        ),
+    )
 
     export_parser = sub.add_parser(
         "export",
