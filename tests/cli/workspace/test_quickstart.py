@@ -21,7 +21,6 @@ if TYPE_CHECKING:
 
 
 _DEFAULTS = {
-    "file": None,
     "specs": [],
     "manifest_format": "conda",
     "name": None,
@@ -232,10 +231,9 @@ def test_quickstart_dry_run_skips_side_effects(
     assert result == 0
     runners = orchestrated["runners"]
     assert runners["init"].calls == []
+    assert runners["add"].calls == []
+    assert runners["install"].calls == []
     assert runners["shell"].calls == []
-    # add/install may or may not be called depending on design; the
-    # critical invariants are "init is not run" (no manifest is
-    # written) and "shell is not spawned".
     assert not (tmp_path / "conda.toml").exists()
 
 
@@ -258,28 +256,42 @@ def test_quickstart_dry_run_with_copy_reports_but_does_not_write(
     assert "Would copy" in rendered
 
 
-def test_quickstart_forwards_install_flags(orchestrated: dict) -> None:
-    """``--force-reinstall`` / ``--locked`` propagate to install."""
-    result = orchestrated["run"](force_reinstall=True, locked=True)
+@pytest.mark.parametrize(
+    ("subhandler", "inputs", "expected"),
+    [
+        (
+            "install",
+            {"force_reinstall": True, "locked": True},
+            {"force_reinstall": True, "locked": True},
+        ),
+        (
+            "init",
+            {
+                "name": "demo",
+                "channels": ["conda-forge", "bioconda"],
+                "platforms": ["linux-64", "osx-arm64"],
+                "manifest_format": "pixi",
+            },
+            {
+                "name": "demo",
+                "channels": ["conda-forge", "bioconda"],
+                "platforms": ["linux-64", "osx-arm64"],
+                "manifest_format": "pixi",
+            },
+        ),
+    ],
+    ids=["install-flags", "init-flags"],
+)
+def test_quickstart_forwards_sub_handler_flags(
+    orchestrated: dict,
+    subhandler: str,
+    inputs: dict,
+    expected: dict,
+) -> None:
+    """Flags defined on init / install are threaded to the matching sub-handler."""
+    result = orchestrated["run"](**inputs)
 
     assert result == 0
-    install_ns = orchestrated["runners"]["install"].calls[0]
-    assert install_ns.force_reinstall is True
-    assert install_ns.locked is True
-
-
-def test_quickstart_forwards_init_flags(orchestrated: dict) -> None:
-    """``--name`` / ``--channel`` / ``--platform`` propagate to init."""
-    result = orchestrated["run"](
-        name="demo",
-        channels=["conda-forge", "bioconda"],
-        platforms=["linux-64", "osx-arm64"],
-        manifest_format="pixi",
-    )
-
-    assert result == 0
-    init_ns = orchestrated["runners"]["init"].calls[0]
-    assert init_ns.name == "demo"
-    assert init_ns.channels == ["conda-forge", "bioconda"]
-    assert init_ns.platforms == ["linux-64", "osx-arm64"]
-    assert init_ns.manifest_format == "pixi"
+    ns = orchestrated["runners"][subhandler].calls[0]
+    for key, value in expected.items():
+        assert getattr(ns, key) == value

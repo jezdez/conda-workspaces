@@ -43,19 +43,6 @@ from .init import execute_init
 from .install import execute_install
 from .shell import execute_shell
 
-#: Global prompt / output flags every sub-handler sees (``--json``,
-#: ``--dry-run``, ``--yes``, ``-v``/``-q``, ``--debug``, ``--trace``).
-#: Forwarded verbatim through :func:`execute_quickstart.with_prompts`.
-_PROMPT_KEYS: tuple[str, ...] = (
-    "json",
-    "yes",
-    "dry_run",
-    "quiet",
-    "verbose",
-    "debug",
-    "trace",
-)
-
 
 def execute_quickstart(
     args: argparse.Namespace,
@@ -66,37 +53,32 @@ def execute_quickstart(
     if console is None:
         console = Console(highlight=False)
 
-    dry_run = bool(getattr(args, "dry_run", False))
-    json_output = bool(getattr(args, "json", False))
-    no_shell = bool(getattr(args, "no_shell", False)) or json_output
-    copy_from: Path | None = getattr(args, "copy_from", None)
-    specs: list[str] = list(getattr(args, "specs", None) or [])
-    env_name = getattr(args, "environment", "default") or "default"
+    dry_run: bool = args.dry_run
+    json_output: bool = args.json
+    no_shell: bool = args.no_shell or json_output
+    copy_from: Path | None = args.copy_from
+    specs: list[str] = list(args.specs or [])
+    env_name: str = args.environment or "default"
+    fmt: str = args.manifest_format or "conda"
 
     workspace_root = Path.cwd()
-    if getattr(args, "file", None):
-        workspace_root = Path(args.file).resolve().parent
 
-    common_file = getattr(args, "file", None)
+    # Global prompt / output flags every sub-handler must see
+    # (``--json`` / ``--dry-run`` / ``--yes`` / ``-v`` / ``-q`` /
+    # ``--debug`` / ``--trace``) so terminal output and machine-readable
+    # output stay coherent across the pipeline.  ``add_output_and_prompt_options``
+    # on the parent parser guarantees each attribute exists.
+    prompt_keys = ("json", "yes", "dry_run", "quiet", "verbose", "debug", "trace")
 
     def with_prompts(**kwargs: object) -> argparse.Namespace:
-        """Build a sub-handler ``Namespace`` from *kwargs* + ``_PROMPT_KEYS``.
-
-        Each sub-handler call site lists the flags it cares about
-        explicitly; this closure fills in the global prompt/output
-        flags (``--json`` / ``--dry-run`` / etc.) that every handler
-        must see so terminal output and machine-readable output stay
-        coherent across the pipeline.
-        """
+        """Build a sub-handler ``Namespace`` from *kwargs* + ``prompt_keys``."""
         ns = argparse.Namespace(**kwargs)
-        for key in _PROMPT_KEYS:
-            setattr(ns, key, getattr(args, key, None))
+        for key in prompt_keys:
+            setattr(ns, key, getattr(args, key))
         return ns
 
-    fmt = getattr(args, "manifest_format", None) or "conda"
-
     if copy_from is not None:
-        if getattr(args, "manifest_format", None) not in (None, "conda"):
+        if args.manifest_format not in (None, "conda"):
             console.print(
                 "[bold yellow]Warning[/bold yellow] --format is ignored when"
                 " --copy/--clone is used; the copied manifest dictates the"
@@ -148,35 +130,38 @@ def execute_quickstart(
         execute_init(
             with_prompts(
                 file=None,
-                manifest_format=getattr(args, "manifest_format", None),
-                name=getattr(args, "name", None),
-                channels=getattr(args, "channels", None),
-                platforms=getattr(args, "platforms", None),
+                manifest_format=args.manifest_format,
+                name=args.name,
+                channels=args.channels,
+                platforms=args.platforms,
             )
         )
         manifest_path = ManifestParser.for_format(fmt).manifest_path(workspace_root)
 
-    if specs:
+    if dry_run:
+        # No manifest on disk yet; skip add/install side effects.
+        pass
+    elif specs:
         execute_add(
             with_prompts(
-                file=common_file,
+                file=None,
                 specs=list(specs),
                 environment=None,
                 feature=None,
                 pypi=False,
                 no_install=False,
                 no_lockfile_update=False,
-                force_reinstall=bool(getattr(args, "force_reinstall", False)),
+                force_reinstall=args.force_reinstall,
             )
         )
     else:
         execute_install(
             with_prompts(
-                file=common_file,
-                environment=getattr(args, "environment", None),
-                force_reinstall=getattr(args, "force_reinstall", None),
-                locked=getattr(args, "locked", None),
-                frozen=getattr(args, "frozen", None),
+                file=None,
+                environment=args.environment,
+                force_reinstall=args.force_reinstall,
+                locked=args.locked,
+                frozen=args.frozen,
             )
         )
 
@@ -184,7 +169,7 @@ def execute_quickstart(
     if not no_shell and not dry_run:
         execute_shell(
             with_prompts(
-                file=common_file,
+                file=None,
                 environment=env_name,
                 cmd=None,
             )
