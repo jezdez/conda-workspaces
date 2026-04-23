@@ -150,7 +150,7 @@ def execute_export(
             requested_platforms=requested_platforms,
         )
 
-    exporter, resolved_format = _resolve_exporter(
+    exporter, resolved_format = resolve_exporter(
         format_name=getattr(args, "format", None),
         file_path=getattr(args, "file", None),
     )
@@ -160,7 +160,7 @@ def execute_export(
             f"Multiple platforms are not supported for the '{exporter.name}' exporter."
         )
 
-    content = _run_exporter(exporter, envs)
+    content = run_exporter(exporter, envs)
 
     output_path: Path | None = getattr(args, "file", None)
     dry_run = bool(getattr(args, "dry_run", False))
@@ -232,17 +232,16 @@ def build_from_declared(
     """
     try:
         declared = resolve_environment(config, env_name)
-        declared_platforms = (
-            tuple(declared.platforms) or tuple(config.platforms) or (ctx.platform,)
-        )
     except PlatformError:
-        declared_platforms = (ctx.platform,)
-
-    targets = _targets_for_env(
-        declared=declared_platforms,
-        requested=requested_platforms,
-        fallback=ctx.platform,
-    )
+        # Manifest declares platforms conda doesn't know; fall back to
+        # the host platform so the export still produces something
+        # useful rather than crashing on validation alone.
+        targets: tuple[str, ...] = (ctx.platform,)
+    else:
+        targets = declared.target_platforms(
+            requested=requested_platforms,
+            fallback=ctx.platform,
+        )
 
     envs: list[Environment] = []
     for platform in targets:
@@ -277,28 +276,17 @@ def build_from_declared(
     return envs
 
 
-def _targets_for_env(
-    *,
-    declared: tuple[str, ...],
-    requested: tuple[str, ...],
-    fallback: str,
-) -> tuple[str, ...]:
-    """Intersect *declared* platforms with any explicitly *requested* ones."""
-    declared_set = set(declared) or {fallback}
-    if not requested:
-        return tuple(sorted(declared_set))
-    unknown = [p for p in requested if p not in declared_set]
-    if unknown:
-        raise PlatformError(unknown[0], sorted(declared_set))
-    return tuple(p for p in requested if p in declared_set)
-
-
-def _resolve_exporter(
+def resolve_exporter(
     *,
     format_name: str | None,
     file_path: Path | None,
 ) -> tuple[CondaEnvironmentExporter, str]:
     """Look up the plugin exporter to use and return ``(exporter, name)``.
+
+    Thin public wrapper over :attr:`conda.base.context.context.plugin_manager`
+    — no existing workspace class owns exporter dispatch, and conda's
+    ``CondaEnvironmentExporter`` is not ours to extend — kept as a
+    free function matching :func:`build_from_declared` / :func:`run_exporter`.
 
     Precedence matches ``conda export``:
 
@@ -320,11 +308,18 @@ def _resolve_exporter(
     return exporter, exporter.name
 
 
-def _run_exporter(
+def run_exporter(
     exporter: CondaEnvironmentExporter,
     envs: list[Environment],
 ) -> str:
-    """Invoke the exporter, preferring ``multiplatform_export`` when available."""
+    """Invoke *exporter*, preferring ``multiplatform_export`` when available.
+
+    Companion to :func:`resolve_exporter`: once an exporter has been
+    selected, this normalises the conda plugin interface's two entry
+    points (``multiplatform_export`` for a list of environments,
+    ``export`` for a single one) and always appends a trailing newline
+    so callers can write the result verbatim.
+    """
     if exporter.multiplatform_export is not None:
         content = exporter.multiplatform_export(envs)
     elif exporter.export is not None:

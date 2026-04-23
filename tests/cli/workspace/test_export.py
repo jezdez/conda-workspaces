@@ -10,10 +10,9 @@ import pytest
 from rich.console import Console
 
 from conda_workspaces.cli.workspace.export import (
-    _resolve_exporter,
-    _run_exporter,
-    _targets_for_env,
     execute_export,
+    resolve_exporter,
+    run_exporter,
 )
 from conda_workspaces.exceptions import (
     EnvironmentNotFoundError,
@@ -21,6 +20,7 @@ from conda_workspaces.exceptions import (
     LockfileNotFoundError,
     PlatformError,
 )
+from conda_workspaces.resolver import ResolvedEnvironment
 
 from ..conftest import make_args
 
@@ -70,7 +70,7 @@ def export_console() -> Console:
 )
 def test_resolve_exporter_by_format(format_name: str, expected_name: str) -> None:
     """The plugin registry resolves canonical names and aliases identically."""
-    exporter, resolved = _resolve_exporter(format_name=format_name, file_path=None)
+    exporter, resolved = resolve_exporter(format_name=format_name, file_path=None)
     assert exporter.name == expected_name
     assert resolved == expected_name
 
@@ -89,7 +89,7 @@ def test_resolve_exporter_detects_by_filename(
     tmp_path: Path, filename: str, expected_name: str
 ) -> None:
     path = tmp_path / filename
-    exporter, resolved = _resolve_exporter(format_name=None, file_path=path)
+    exporter, resolved = resolve_exporter(format_name=None, file_path=path)
     assert exporter.name == expected_name
     assert resolved == expected_name
 
@@ -98,7 +98,7 @@ def test_resolve_exporter_unknown_format_raises() -> None:
     from conda.exceptions import CondaValueError
 
     with pytest.raises(CondaValueError, match="Unknown export format"):
-        _resolve_exporter(format_name="not-a-real-format", file_path=None)
+        resolve_exporter(format_name="not-a-real-format", file_path=None)
 
 
 @pytest.mark.parametrize(
@@ -110,25 +110,20 @@ def test_resolve_exporter_unknown_format_raises() -> None:
     ],
     ids=["all-declared", "intersect-single", "fallback-when-none-declared"],
 )
-def test_targets_for_env(
+def test_resolved_environment_target_platforms(
     declared: tuple[str, ...],
     requested: tuple[str, ...],
     fallback: str,
     expected: tuple[str, ...],
 ) -> None:
-    assert (
-        _targets_for_env(declared=declared, requested=requested, fallback=fallback)
-        == expected
-    )
+    env = ResolvedEnvironment(name="default", platforms=list(declared))
+    assert env.target_platforms(requested=requested, fallback=fallback) == expected
 
 
-def test_targets_for_env_rejects_unknown_platform() -> None:
+def test_resolved_environment_target_platforms_rejects_unknown() -> None:
+    env = ResolvedEnvironment(name="default", platforms=["linux-64"])
     with pytest.raises(PlatformError):
-        _targets_for_env(
-            declared=("linux-64",),
-            requested=("no-such-subdir",),
-            fallback="linux-64",
-        )
+        env.target_platforms(requested=("no-such-subdir",), fallback="linux-64")
 
 
 def test_export_unknown_environment_raises(
@@ -341,7 +336,7 @@ def test_run_exporter_prefers_multiplatform() -> None:
             calls.append(list(envs))
             return "MULTI"
 
-    content = _run_exporter(FakeExporter(), ["a", "b"])  # type: ignore[list-item]
+    content = run_exporter(FakeExporter(), ["a", "b"])  # type: ignore[list-item]
     assert content == "MULTI\n"
     assert calls == [["a", "b"]]
 
@@ -356,5 +351,5 @@ def test_run_exporter_falls_back_to_single() -> None:
         def export(self, env):
             return env + "no-trailing-newline"
 
-    content = _run_exporter(FakeExporter(), ["a"])  # type: ignore[list-item]
+    content = run_exporter(FakeExporter(), ["a"])  # type: ignore[list-item]
     assert content == "ano-trailing-newline\n"
