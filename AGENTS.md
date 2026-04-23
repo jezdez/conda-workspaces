@@ -107,8 +107,12 @@
   are `ResolvedEnvironment.virtual_package_overrides` /
   `scoped_virtual_packages` in `resolver.py` (moved out of
   `lockfile.py` private helpers) and `ManifestParser.for_format` /
-  `resolve_source` / `copy_manifest` in `manifests/base.py` (moved
-  out of `cli/workspace/quickstart.py` private helpers).
+  `resolve_source` / `copy_manifest` / `write_workspace_stub` /
+  `export` in `manifests/base.py` (moved out of
+  `cli/workspace/quickstart.py` / `cli/workspace/init.py` private
+  helpers; `export` is also what the ``conda-toml`` / ``pixi-toml``
+  / ``pyproject-toml`` exporter plugins in `plugin.py` register as
+  ``multiplatform_export``).
 
 - Before adding a new private module-level helper, check in order:
   1. Does conda (or another existing dependency like
