@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from conda_workspaces.export import (
-    _envs_to_dict,
+    envs_to_dict,
     multiplatform_export,
 )
 from conda_workspaces.lockfile import LOCKFILE_VERSION
@@ -49,7 +49,7 @@ def test_envs_to_dict_single_env() -> None:
         packages=[pkg],
     )
 
-    result = _envs_to_dict([env])  # type: ignore[arg-type]
+    result = envs_to_dict([env])  # type: ignore[arg-type]
 
     assert result["version"] == LOCKFILE_VERSION
     assert "default" in result["environments"]
@@ -66,7 +66,7 @@ def test_envs_to_dict_deduplicates_packages() -> None:
     env1 = FakeEnvironment("default", "linux-64", ("conda-forge",), [pkg])
     env2 = FakeEnvironment("test", "linux-64", ("conda-forge",), [pkg])
 
-    result = _envs_to_dict([env1, env2])  # type: ignore[arg-type]
+    result = envs_to_dict([env1, env2])  # type: ignore[arg-type]
 
     assert len(result["packages"]) == 1
     assert "default" in result["environments"]
@@ -79,7 +79,7 @@ def test_envs_to_dict_multiple_platforms() -> None:
     env_lin = FakeEnvironment("default", "linux-64", ("conda-forge",), [pkg_lin])
     env_mac = FakeEnvironment("default", "osx-arm64", ("conda-forge",), [pkg_mac])
 
-    result = _envs_to_dict([env_lin, env_mac])  # type: ignore[arg-type]
+    result = envs_to_dict([env_lin, env_mac])  # type: ignore[arg-type]
 
     pkgs_by_plat = result["environments"]["default"]["packages"]
     assert "linux-64" in pkgs_by_plat
@@ -95,7 +95,7 @@ def test_envs_to_dict_includes_external_packages() -> None:
         external={"pip": ["https://pypi.org/simple/requests/"]},
     )
 
-    result = _envs_to_dict([env])  # type: ignore[arg-type]
+    result = envs_to_dict([env])  # type: ignore[arg-type]
 
     refs = result["environments"]["default"]["packages"]["linux-64"]
     assert {"pip": "https://pypi.org/simple/requests/"} in refs
@@ -105,7 +105,7 @@ def test_envs_to_dict_no_name_defaults() -> None:
     """Environment with name=None gets filed under 'default'."""
     env = FakeEnvironment(None, "linux-64", ("conda-forge",))  # type: ignore[arg-type]
 
-    result = _envs_to_dict([env])  # type: ignore[arg-type]
+    result = envs_to_dict([env])  # type: ignore[arg-type]
 
     assert "default" in result["environments"]
 
@@ -113,7 +113,7 @@ def test_envs_to_dict_no_name_defaults() -> None:
 def test_envs_to_dict_channels() -> None:
     env = FakeEnvironment("default", "linux-64", ("conda-forge", "bioconda"))
 
-    result = _envs_to_dict([env])  # type: ignore[arg-type]
+    result = envs_to_dict([env])  # type: ignore[arg-type]
 
     channels = result["environments"]["default"]["channels"]
     assert channels == [{"url": "conda-forge"}, {"url": "bioconda"}]

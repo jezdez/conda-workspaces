@@ -84,13 +84,16 @@ DEFAULT_FORMAT = "environment-yaml"
 _EXTERNAL_PACKAGES_PYPI_KEY = "pip"
 
 
-# ---------------------------------------------------------------------------
-# Provider side: ``conda-workspaces-lock-v1`` exporter
-# ---------------------------------------------------------------------------
+def envs_to_dict(envs: Iterable[Environment]) -> dict[str, Any]:
+    """Build a ``conda.lock`` YAML-ready dict from ``Environment`` objects.
 
-
-def _envs_to_dict(envs: Iterable[Environment]) -> dict[str, Any]:
-    """Build a lockfile dict from conda ``Environment`` objects."""
+    The dict-level counterpart to :func:`multiplatform_export`: same
+    output shape (``version`` / ``environments`` / ``packages``)
+    minus the final YAML dump.  Public so callers that want to
+    inspect, merge, or hand off to a different serialiser can reuse
+    the same composition logic that backs
+    ``conda-workspaces-lock-v1``.
+    """
     seen_urls: set[str] = set()
     packages: list[dict[str, Any]] = []
     environments: dict[str, dict[str, Any]] = {}
@@ -137,19 +140,16 @@ def _envs_to_dict(envs: Iterable[Environment]) -> dict[str, Any]:
 def multiplatform_export(envs: Iterable[Environment]) -> str:
     """Export ``Environment`` objects to a ``conda.lock`` YAML string.
 
-    This function is registered as the ``multiplatform_export`` callable
-    on the ``CondaEnvironmentExporter``.  conda calls it with one
-    ``Environment`` per platform.
+    Registered as the ``multiplatform_export`` callable on our
+    ``CondaEnvironmentExporter``; conda calls it with one
+    ``Environment`` per platform.  Composition runs through
+    :func:`envs_to_dict` so callers that want the pre-YAML dict
+    representation share the exact same logic.
     """
-    env_dict = _envs_to_dict(envs)
+    env_dict = envs_to_dict(envs)
     buf = io.StringIO()
     yaml_dump(env_dict, buf)
     return buf.getvalue()
-
-
-# ---------------------------------------------------------------------------
-# Consumer side: Environment builders for the three workspace sources
-# ---------------------------------------------------------------------------
 
 
 def build_from_declared(
@@ -294,11 +294,6 @@ def build_from_lockfile(
         return [loader.env_for(platform=p, name=env_name) for p in targets]
     except ValueError as exc:
         raise LockfileNotFoundError(env_name, path) from exc
-
-
-# ---------------------------------------------------------------------------
-# Consumer side: exporter dispatch over ``conda_context.plugin_manager``
-# ---------------------------------------------------------------------------
 
 
 def resolve_exporter(
