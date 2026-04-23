@@ -9,11 +9,13 @@ each one and stitches their outputs together.
 
 The one concession to user experience lives at the ``--copy`` / ``--clone``
 path: when the user points quickstart at an existing workspace, we
-copy whichever manifest (``conda.toml`` / ``pixi.toml`` /
-``pyproject.toml``) :func:`manifests.detect_workspace_file` finds there
-into the current directory and skip the ``init`` step entirely.  Any
-``--format`` value is ignored with a warning in that case — the copied
-manifest already dictates the format.
+delegate to :meth:`ManifestParser.copy_manifest` (which walks the
+source with :func:`manifests.detect_workspace_file` when given a
+directory) to copy whichever manifest — ``conda.toml`` /
+``pixi.toml`` / ``pyproject.toml`` — lives there into the current
+directory and skip the ``init`` step entirely.  Any ``--format``
+value is ignored with a warning in that case — the copied manifest
+already dictates the format.
 
 The ``--json`` path is self-contained: we swallow sub-handler console
 output and emit a single structured result at the end, mirroring the
@@ -25,14 +27,17 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import sys
 from pathlib import Path
 
 from rich.console import Console
 
-from ...exceptions import CondaWorkspacesError
-from ...manifests import detect_workspace_file
+from ...exceptions import (
+    CondaWorkspacesError,
+    ManifestExistsError,
+    WorkspaceNotFoundError,
+)
+from ...manifests.base import ManifestParser
 from .add import execute_add
 from .init import execute_init
 from .install import execute_install
@@ -92,6 +97,8 @@ def execute_quickstart(
             setattr(ns, key, getattr(args, key, None))
         return ns
 
+    fmt = getattr(args, "manifest_format", None) or "conda"
+
     if copy_from is not None:
         if getattr(args, "manifest_format", None) not in (None, "conda"):
             console.print(
@@ -110,7 +117,7 @@ def execute_quickstart(
             "[bold blue]Would create[/bold blue] workspace manifest in"
             f" [bold]{workspace_root}[/bold]"
         )
-        manifest_path = _guess_manifest_path(workspace_root, args)
+        manifest_path = ManifestParser.for_format(fmt).manifest_path(workspace_root)
     else:
         execute_init(
             with_prompts(
@@ -121,7 +128,7 @@ def execute_quickstart(
                 platforms=getattr(args, "platforms", None),
             )
         )
-        manifest_path = _guess_manifest_path(workspace_root, args)
+        manifest_path = ManifestParser.for_format(fmt).manifest_path(workspace_root)
 
     if specs:
         execute_add(
@@ -184,63 +191,47 @@ def _copy_manifest(
     dry_run: bool,
     console: Console,
 ) -> Path:
-    """Copy the workspace manifest from *source* into *dest_dir*.
+    """CLI presentation wrapper around :meth:`ManifestParser.copy_manifest`.
 
-    *source* may be either a directory containing a manifest or a path
-    to the manifest itself.  The returned path is the manifest location
-    inside *dest_dir*.
+    Resolves *source* (dir or file) to the manifest the classmethod
+    would copy, then either previews the move (``--dry-run``) or
+    performs it.  Translates the underlying file / manifest errors
+    into :class:`QuickstartCopyError` so quickstart's error surface
+    stays uniform.
     """
-    if not source.exists():
+    try:
+        manifest = ManifestParser.resolve_source(source)
+        target = dest_dir / manifest.name
+        if target.exists():
+            raise ManifestExistsError(target)
+        if dry_run:
+            console.print(
+                f"[bold blue]Would copy[/bold blue] [bold]{manifest}[/bold]"
+                f" -> [bold]{target}[/bold]"
+            )
+            return target
+        ManifestParser.copy_manifest(source, dest_dir)
+    except FileNotFoundError as exc:
         raise QuickstartCopyError(
             f"--copy source '{source}' does not exist.",
             hints=["Pass an existing workspace directory or manifest file."],
-        )
-
-    if source.is_dir():
-        try:
-            manifest = detect_workspace_file(source)
-        except CondaWorkspacesError as exc:
-            raise QuickstartCopyError(
-                f"--copy source '{source}' does not contain a workspace manifest.",
-                hints=list(getattr(exc, "hints", None) or []),
-            ) from exc
-    else:
-        manifest = source
-
-    target = dest_dir / manifest.name
-    if target.exists():
+        ) from exc
+    except WorkspaceNotFoundError as exc:
         raise QuickstartCopyError(
-            f"'{target}' already exists; refusing to overwrite.",
+            f"--copy source '{source}' does not contain a workspace manifest.",
+            hints=list(exc.hints),
+        ) from exc
+    except ManifestExistsError as exc:
+        raise QuickstartCopyError(
+            f"'{exc.path}' already exists; refusing to overwrite.",
             hints=["Remove the existing manifest or pick a different directory."],
-        )
+        ) from exc
 
-    if dry_run:
-        console.print(
-            f"[bold blue]Would copy[/bold blue] [bold]{manifest}[/bold]"
-            f" -> [bold]{target}[/bold]"
-        )
-        return target
-
-    shutil.copyfile(manifest, target)
     console.print(
         f"[bold cyan]Copied[/bold cyan] [bold]{manifest.name}[/bold]"
         f" from [bold]{manifest.parent}[/bold]"
     )
     return target
-
-
-def _guess_manifest_path(workspace_root: Path, args: argparse.Namespace) -> Path:
-    """Pick the manifest path init will (or did) write.
-
-    Used only for the ``--json`` payload; falls back to ``conda.toml``
-    when the format is unspecified so the output field is never empty.
-    """
-    fmt = getattr(args, "manifest_format", None) or "conda"
-    if fmt == "pixi":
-        return workspace_root / "pixi.toml"
-    if fmt == "pyproject":
-        return workspace_root / "pyproject.toml"
-    return workspace_root / "conda.toml"
 
 
 __all__ = [

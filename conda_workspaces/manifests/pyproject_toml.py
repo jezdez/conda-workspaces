@@ -36,6 +36,7 @@ class PyprojectTomlParser(ManifestParser):
     2. ``[tool.pixi.*]`` – pixi compatibility
     """
 
+    format_alias = "pyproject"
     filenames = ("pyproject.toml",)
 
     def can_handle(self, path: Path) -> bool:

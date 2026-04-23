@@ -10,6 +10,7 @@ from conda.base.context import context as conda_context
 from rich.console import Console
 
 from ...exceptions import ManifestExistsError
+from ...manifests.base import ManifestParser
 from .. import status
 
 if TYPE_CHECKING:
@@ -31,21 +32,14 @@ def execute_init(args: argparse.Namespace, *, console: Console | None = None) ->
 
     base_dir = Path(args.file).parent if args.file else Path.cwd()
 
-    if fmt == "pixi":
-        return _write_workspace_toml(
-            "pixi.toml", name, channels, platforms, base_dir, console=console
-        )
-    elif fmt == "conda":
-        return _write_workspace_toml(
-            "conda.toml", name, channels, platforms, base_dir, console=console
-        )
-    elif fmt == "pyproject":
+    parser = ManifestParser.for_format(fmt)
+    if fmt == "pyproject":
         return _write_pyproject_toml(
             name, channels, platforms, base_dir, console=console
         )
-
-    msg = f"Unknown manifest format: {fmt}"
-    raise ValueError(msg)
+    return _write_workspace_toml(
+        parser.manifest_filename, name, channels, platforms, base_dir, console=console
+    )
 
 
 def _detect_platforms() -> list[str]:
