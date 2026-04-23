@@ -8,6 +8,8 @@ constituent features.
 from __future__ import annotations
 
 import logging
+import os
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -16,7 +18,7 @@ from .exceptions import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Iterator
 
     from .models import Channel, MatchSpec, PyPIDependency, WorkspaceConfig
 
@@ -40,6 +42,94 @@ class ResolvedEnvironment:
     activation_env: dict[str, str] = field(default_factory=dict)
     system_requirements: dict[str, str] = field(default_factory=dict)
     channel_priority: str | None = None
+
+    def baseline_virtual_package_env(self, platform: str) -> dict[str, str]:
+        """Return ``CONDA_OVERRIDE_*`` env vars that enable a cross-platform solve.
+
+        Mirrors ``rattler_virtual_packages::VirtualPackages::detect_for_platform``
+        from ``rattler``: when we solve for a target that the *host* cannot
+        detect a virtual package for (e.g. ``linux-64`` from macOS emits
+        no ``__glibc`` record), inject conservative defaults so packages
+        gated on those virtuals remain resolvable out of the box.
+
+        Precedence (highest to lowest):
+
+        1. ``CONDA_OVERRIDE_*`` already present in :data:`os.environ` — the
+           user is explicitly in charge and this helper returns no entry
+           for that key, leaving the existing value untouched.
+        2. ``[system-requirements]`` declared in the manifest for the same
+           virtual package (e.g. ``glibc = "2.28"``) — used as the override
+           so the virtual package record lines up with the spec constraint
+           :mod:`conda_workspaces.envs._apply_system_requirements` appends.
+        3. A conservative built-in baseline (``__glibc == 2.17`` for any
+           non-native linux target, ``__osx >= 10.15`` / ``>= 11.0`` for
+           ``osx-64`` / ``osx-arm64`` cross-compiles, presence-only
+           ``__win`` for win targets).
+
+        ``__cuda`` and ``__archspec`` are *not* seeded — the caller must
+        opt in via ``[system-requirements]`` or ``CONDA_OVERRIDE_*`` if
+        they want those available.  Native solves (target family matches
+        host family) return an empty mapping so byte-for-byte output stays
+        unchanged.
+        """
+        from conda.base.context import context as conda_context
+
+        def family(subdir: str) -> str:
+            for fam in ("linux", "osx", "win"):
+                if subdir.startswith(f"{fam}-"):
+                    return fam
+            return ""
+
+        target_family = family(platform)
+        if not target_family or family(conda_context.subdir) == target_family:
+            return {}
+
+        def req_version(name: str) -> str | None:
+            """Look up a ``[system-requirements]`` entry by bare or ``__`` name."""
+            return self.system_requirements.get(name) or self.system_requirements.get(
+                f"__{name}"
+            )
+
+        baseline: dict[str, str] = {}
+        if target_family == "linux":
+            baseline["CONDA_OVERRIDE_GLIBC"] = req_version("glibc") or "2.17"
+        elif target_family == "osx":
+            default = "11.0" if platform == "osx-arm64" else "10.15"
+            baseline["CONDA_OVERRIDE_OSX"] = req_version("osx") or default
+        elif target_family == "win":
+            baseline["CONDA_OVERRIDE_WIN"] = req_version("win") or "0"
+
+        return {k: v for k, v in baseline.items() if k not in os.environ}
+
+    @contextmanager
+    def scoped_solver_env(self, platform: str) -> Iterator[None]:
+        """Scope :meth:`baseline_virtual_package_env` around a solver call.
+
+        Conda deprecated :func:`conda.common.io.env_vars` and its siblings
+        in 26.9 (removal targeted for 27.3) and recommends
+        ``monkeypatch.setenv`` / ``monkeypatch.delenv`` as replacements —
+        but those are test-only.  This production path needs to scope
+        ``CONDA_OVERRIDE_*`` overrides around a solver call, for which
+        upstream does not ship a drop-in replacement, so we keep a small
+        local context manager until conda exposes one (tracked in
+        ``conda/conda#14095`` / PR ``conda/conda#15728``).
+        """
+        overrides = self.baseline_virtual_package_env(platform)
+        if not overrides:
+            yield
+            return
+        saved: dict[str, str | None] = {
+            name: os.environ.get(name) for name in overrides
+        }
+        os.environ.update(overrides)
+        try:
+            yield
+        finally:
+            for name, previous in saved.items():
+                if previous is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = previous
 
 
 def resolve_environment(

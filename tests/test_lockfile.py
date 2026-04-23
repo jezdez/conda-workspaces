@@ -21,7 +21,6 @@ from conda_workspaces.lockfile import (
     LOCKFILE_NAME,
     LOCKFILE_VERSION,
     CondaLockLoader,
-    _baseline_virtual_package_env,
     generate_lockfile,
     install_from_lockfile,
     lockfile_path,
@@ -647,7 +646,8 @@ def test_baseline_virtual_package_env_by_target(
     monkeypatch.delenv("CONDA_OVERRIDE_OSX", raising=False)
     monkeypatch.delenv("CONDA_OVERRIDE_WIN", raising=False)
 
-    assert _baseline_virtual_package_env(target) == expected
+    env = ResolvedEnvironment(name="test")
+    assert env.baseline_virtual_package_env(target) == expected
 
 
 def test_baseline_virtual_package_env_respects_existing_env(
@@ -659,7 +659,8 @@ def test_baseline_virtual_package_env_respects_existing_env(
     monkeypatch.setattr(conda_context, "_subdir", "osx-arm64")
     monkeypatch.setenv("CONDA_OVERRIDE_GLIBC", "2.28")
 
-    assert _baseline_virtual_package_env("linux-64") == {}
+    env = ResolvedEnvironment(name="test")
+    assert env.baseline_virtual_package_env("linux-64") == {}
 
 
 @pytest.mark.parametrize(
@@ -688,7 +689,8 @@ def test_baseline_virtual_package_env_lifts_system_requirements(
     monkeypatch.setattr(conda_context, "_subdir", "osx-arm64")
     monkeypatch.delenv("CONDA_OVERRIDE_GLIBC", raising=False)
 
-    assert _baseline_virtual_package_env("linux-64", system_requirements) == expected
+    env = ResolvedEnvironment(name="test", system_requirements=system_requirements)
+    assert env.baseline_virtual_package_env("linux-64") == expected
 
 
 def test_solve_for_records_applies_baseline_env_during_solve(
