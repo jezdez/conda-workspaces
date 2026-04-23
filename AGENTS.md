@@ -102,9 +102,9 @@
   `obj.foo(platform)` instead of `_foo(platform, obj.attr)`, tests
   instantiate the class directly instead of threading loose arguments,
   and the public surface stays discoverable. The canonical examples
-  are `ResolvedEnvironment.baseline_virtual_package_env` /
-  `scoped_solver_env` in `resolver.py` (moved out of `lockfile.py`
-  private helpers) and `ManifestParser.for_format` /
+  are `ResolvedEnvironment.virtual_package_overrides` /
+  `scoped_virtual_packages` in `resolver.py` (moved out of
+  `lockfile.py` private helpers) and `ManifestParser.for_format` /
   `resolve_source` / `copy_manifest` in `manifests/base.py` (moved
   out of `cli/workspace/quickstart.py` private helpers).
 
