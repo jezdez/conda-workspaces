@@ -410,3 +410,54 @@ def test_export_manifest_format_plugin_hook(
     for key in path:
         cursor = cursor[key]  # type: ignore[index]
     assert cursor["platforms"] == ["linux-64", "osx-arm64"]
+
+
+def test_export_pyproject_merges_into_existing_file(
+    pixi_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    export_console: Console,
+) -> None:
+    """``--format pyproject-toml --file pyproject.toml`` preserves peer tables.
+
+    Regression guard for #41: a naive exporter that just
+    ``Path.write_text``s the plugin output would destroy
+    ``[project]`` / ``[build-system]`` / ``[tool.ruff]`` and any
+    other section in an existing ``pyproject.toml``.
+    :meth:`PyprojectTomlParser.merge_export`, wired in
+    :func:`execute_export`, splices the exporter's ``[tool.conda]``
+    subtree in instead.
+    """
+    monkeypatch.chdir(pixi_workspace)
+    pyproject = pixi_workspace / "pyproject.toml"
+    pyproject.write_text(
+        """\
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "my-pkg"
+version = "0.1.0"
+
+[tool.ruff]
+line-length = 120
+""",
+        encoding="utf-8",
+    )
+
+    result = execute_export(
+        make_args(
+            _DEFAULTS,
+            file=pyproject,
+            format="pyproject-toml",
+            export_platforms=["linux-64"],
+        ),
+        console=export_console,
+    )
+
+    assert result == 0
+    data = tomlkit.loads(pyproject.read_text(encoding="utf-8")).unwrap()
+    assert data["build-system"]["build-backend"] == "hatchling.build"
+    assert data["project"] == {"name": "my-pkg", "version": "0.1.0"}
+    assert data["tool"]["ruff"] == {"line-length": 120}
+    assert data["tool"]["conda"]["workspace"]["platforms"] == ["linux-64"]

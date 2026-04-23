@@ -150,6 +150,27 @@ class ManifestParser(ABC):
         path.write_text(tomlkit.dumps(doc), encoding="utf-8")
         return path, "Created"
 
+    def merge_export(self, existing_path: Path, exported: str) -> str:
+        """Return *exported* ready to write into an existing *existing_path*.
+
+        The default implementation returns *exported* unchanged —
+        ``conda.toml`` and ``pixi.toml`` are manifests we own
+        end-to-end, so regenerating them from an environment is a
+        full replacement (same as ``conda export -f
+        environment.yaml`` overwriting an existing environment.yaml).
+
+        :class:`PyprojectTomlParser` overrides this to splice the
+        exporter's ``[tool.conda]`` subtree into the existing
+        ``pyproject.toml`` document without disturbing peer tables
+        (``[project]``, ``[build-system]``, ``[tool.ruff]`` etc.),
+        because ``pyproject.toml`` is a shared manifest owned by the
+        Python ecosystem.  Called from :mod:`conda_workspaces.cli.workspace.export`
+        only when ``--file`` points to an existing file, so a fresh
+        export still writes the exporter output verbatim.
+        """
+        del existing_path
+        return exported
+
     def export(self, envs: Iterable[Environment]) -> str:
         """Serialize *envs* to this parser's manifest format.
 
