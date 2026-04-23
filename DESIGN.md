@@ -367,16 +367,13 @@ conda-workspaces is installed.
 - **Multi-package workspaces**: Support monorepo layouts where
   subdirectories are independent packages that can depend on each other
   (pixi's `[package]` concept, reimagined for conda-build).
-- **Virtual package defaults for cross-compiled targets**: `pixi`
-  ships conservative baseline versions for virtual packages that
-  cannot be detected on the host machine (e.g. solving `linux-64`
-  from macOS returns a baseline `__glibc` version so `glibc`-gated
-  packages still resolve). `conda-workspaces` currently relies on
-  conda's own virtual package plugins, which gate on the target
-  subdir, plus the `CONDA_OVERRIDE_*` environment variables and the
-  manifest `[system-requirements]` table. Porting pixi/rattler's
-  conservative defaults to Python would remove the need for users to
-  pin these explicitly when cross-compiling.
+- **Upstream a cross-target virtual package helper in conda**: the
+  baseline defaults `conda-workspaces` applies when cross-compiling
+  (see "Lockfile generation" below) duplicate logic from
+  `rattler_virtual_packages::VirtualPackages::detect_for_platform`.
+  A shared `context.virtual_packages_for_target(subdir)` helper in
+  conda itself would let every downstream lockfile/exporter reuse
+  the same baselines without re-implementing them.
 
 ## Lockfile generation
 
@@ -402,6 +399,20 @@ Users can still influence virtual packages through the usual channels:
   `envs._apply_system_requirements`).
 - `CONDA_OVERRIDE_*` environment variables are honoured because they
   flow through `context._override_virtual_packages` untouched.
+
+Cross-compiled targets (e.g. solving `linux-64` from macOS) get a
+conservative baseline for virtual packages the host cannot detect,
+mirroring `rattler_virtual_packages::VirtualPackages::detect_for_platform`:
+`lockfile._baseline_virtual_package_env` seeds `CONDA_OVERRIDE_GLIBC`
+(`2.17` for non-native `linux-*`), `CONDA_OVERRIDE_OSX`
+(`11.0` for `osx-arm64`, `10.15` for `osx-64`), and
+`CONDA_OVERRIDE_WIN` (`0`) for the duration of the solve. User knobs
+win: an explicit `CONDA_OVERRIDE_*` in the environment is preserved,
+and a `[system-requirements]` entry for the same virtual package is
+lifted into the baseline override so the record that populates and
+the spec that checks agree on the version. `__cuda` and `__archspec`
+are never auto-baselined — callers who need them must opt in via
+`[system-requirements]` or `CONDA_OVERRIDE_*`.
 
 Cross-platform solves are fail-fast: the first unsatisfiable
 `(environment, platform)` pair raises `SolveError` with the platform

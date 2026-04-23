@@ -159,14 +159,17 @@ conda task export --file pixi.toml -o conda.toml
 conda's `context._subdir` at the target so `__linux` / `__osx` /
 `__win` virtual packages line up with the target platform.
 
-One difference to keep in mind: pixi (via rattler) ships conservative
-baseline versions for virtual packages that the host machine can't
-detect — e.g. solving `linux-64` from macOS still picks up a baseline
-`__glibc` so `glibc`-gated packages resolve. conda-workspaces relies
-on conda's own virtual package plugins, which only emit entries the
-host can detect. Fill in the blanks with either `CONDA_OVERRIDE_*`
-environment variables or an explicit `[system-requirements]` table in
-the manifest:
+Conservative virtual package baselines are applied automatically:
+solving `linux-64` from macOS seeds `CONDA_OVERRIDE_GLIBC=2.17` for
+the solve, `osx-arm64` targets get `CONDA_OVERRIDE_OSX=11.0`, `osx-64`
+gets `10.15`, and `win-*` targets get a `CONDA_OVERRIDE_WIN=0`
+presence marker. This mirrors rattler's
+`VirtualPackages::detect_for_platform`, so most cross-compiles resolve
+out of the box without any manifest changes.
+
+Explicit knobs still win when you need them. Either export a
+`CONDA_OVERRIDE_*` environment variable or pin the minimum in
+`[system-requirements]`:
 
 ```toml
 [system-requirements]
@@ -174,8 +177,12 @@ glibc = "2.28"
 cuda = "12.0"
 ```
 
-Both settings are also honoured by `pixi`, so this is compatible
-either way.
+A `[system-requirements]` version is lifted into the baseline
+override so the solver's `__<pkg> >=<version>` spec and the virtual
+package record it matches against agree. `__cuda` and `__archspec`
+are *not* auto-seeded — opt in via `[system-requirements]` or
+`CONDA_OVERRIDE_*` when you need them. Every setting here is also
+honoured by `pixi`.
 
 ## What's not supported
 
@@ -186,9 +193,6 @@ Some pixi-only concepts don't apply to conda-workspaces:
 - `deno_task_shell` — conda-workspaces uses native platform shells
 - `solve-group` — accepted for compatibility but has no effect (conda's
   solver operates on a single environment at a time)
-- pixi's built-in conservative virtual package defaults for
-  cross-compiled targets — pin minimums via `[system-requirements]`
-  or `CONDA_OVERRIDE_*` instead (tracked in [DESIGN.md](https://github.com/conda-incubator/conda-workspaces/blob/main/DESIGN.md) under "Future Work")
 
 See [DESIGN.md](https://github.com/conda-incubator/conda-workspaces/blob/main/DESIGN.md)
 for the full compatibility mapping.

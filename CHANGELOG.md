@@ -8,6 +8,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- Cross-platform solves now seed conservative virtual package
+  baselines when the host cannot detect them, mirroring rattler's
+  `VirtualPackages::detect_for_platform`. Solving `linux-64` from
+  macOS (or any other non-native target) sets `CONDA_OVERRIDE_GLIBC`
+  to `2.17` for the duration of the solve; `osx-arm64` cross-compiles
+  get `CONDA_OVERRIDE_OSX=11.0`, `osx-64` gets `10.15`, and `win-*`
+  targets get `CONDA_OVERRIDE_WIN=0`. Native solves are unchanged.
+  Explicit `CONDA_OVERRIDE_*` values stay authoritative, and a
+  `[system-requirements]` entry for the same virtual package is
+  promoted into the baseline override so the spec and the record
+  agree on the version. `__cuda` and `__archspec` are never
+  auto-baselined — declare them in `[system-requirements]` or via
+  `CONDA_OVERRIDE_*` when you need them.
 - `conda workspace lock` now writes a single `conda.lock` that covers
   every platform declared by each environment, not just the host
   platform. Target-platform solves run with `context._subdir`
