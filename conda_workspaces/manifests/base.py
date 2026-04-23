@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 
 import tomlkit
 
+from ..exceptions import ManifestExistsError
+
 if TYPE_CHECKING:
     from pathlib import Path
     from typing import ClassVar
@@ -99,8 +101,6 @@ class ManifestParser(ABC):
         appropriate; callers layer their own dry-run / console policy
         on top.
         """
-        from ..exceptions import ManifestExistsError
-
         manifest = cls.resolve_source(source)
         target = dest_dir / manifest.name
         if target.exists():
