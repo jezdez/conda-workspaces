@@ -91,6 +91,49 @@
 
 - Use `from __future__ import annotations` in all modules.
 
+## Code structure
+
+- Prefer methods on existing classes over module-level private
+  helpers. When a helper is parameterized by data that already lives
+  on a class (a `ResolvedEnvironment`'s `system_requirements`, a
+  `WorkspaceConfig`'s `platforms`, a `ManifestParser`'s `filenames`,
+  etc.), promote it to a method on that class instead of adding a
+  `_foo(data, extra)` free function. Call sites read as
+  `obj.foo(platform)` instead of `_foo(platform, obj.attr)`, tests
+  instantiate the class directly instead of threading loose arguments,
+  and the public surface stays discoverable. The canonical examples
+  are `ResolvedEnvironment.baseline_virtual_package_env` /
+  `scoped_solver_env` in `resolver.py` (moved out of `lockfile.py`
+  private helpers) and `ManifestParser.for_format` /
+  `resolve_source` / `copy_manifest` in `manifests/base.py` (moved
+  out of `cli/workspace/quickstart.py` private helpers).
+
+- Before adding a new private module-level helper, check in order:
+  1. Does conda (or another existing dependency like
+     `conda_lockfiles`) already expose this? Use that instead of
+     re-implementing parts of conda.
+  2. Does an existing dataclass or plugin class in `conda_workspaces`
+     own the data the helper reads? Put it there as a method.
+  3. If it is genuinely generic and reused across modules, make it a
+     public module-level function with a docstring explaining why it
+     is not on a class.
+  4. If it is called exactly once, inline it at the call site.
+
+- Do not use section comments (`# --- Helpers ---`,
+  `# === Public API ===`, `# -- Feature X ---`) to group functions,
+  classes, or tests inside a module. Rely on ordering and module
+  boundaries. If a file feels like it wants section headers, split it
+  into multiple modules. `env_export.py` becoming `export.py` with
+  the CLI shim stripped out is the canonical example.
+
+- Comments should explain non-obvious intent, trade-offs, or
+  constraints the code cannot convey on its own (why a
+  `context._override` is used, why a fetch is network-bound, why a
+  helper exists despite an upstream deprecation). Do not narrate what
+  the code already says (`# increment counter`, `# build the dict`,
+  `# handle the error`). Docstrings are the right place for the
+  *why*; inline comments are a last resort.
+
 ## Testing
 
 - Tests are plain `pytest` functions — no `unittest.TestCase` or other
@@ -103,12 +146,6 @@
   small local classes or `monkeypatch.setattr` with recording closures
   when a test needs to observe calls; do not reach for the `mock`
   package even as a last resort.
-
-- Do not use section comments (e.g., `# --- Section ---`,
-  `# -- Feature X ---`) to group tests. Rely on function naming and
-  module structure for organization. If a file feels like it wants
-  section headers, it should probably be split into multiple test
-  modules.
 
 - Use `pytest.mark.parametrize` extensively. When multiple test cases
   exercise the same logic with different inputs, consolidate them into
