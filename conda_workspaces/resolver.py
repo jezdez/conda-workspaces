@@ -8,6 +8,8 @@ constituent features.
 from __future__ import annotations
 
 import logging
+import os
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -16,7 +18,10 @@ from .exceptions import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Iterator
+    from pathlib import Path
+
+    from conda.models.records import PackageRecord
 
     from .models import Channel, MatchSpec, PyPIDependency, WorkspaceConfig
 
@@ -40,6 +45,190 @@ class ResolvedEnvironment:
     activation_env: dict[str, str] = field(default_factory=dict)
     system_requirements: dict[str, str] = field(default_factory=dict)
     channel_priority: str | None = None
+
+    def virtual_package_overrides(self, platform: str) -> dict[str, str]:
+        """Return ``CONDA_OVERRIDE_*`` env vars that enable a cross-platform solve.
+
+        Mirrors ``rattler_virtual_packages::VirtualPackages::detect_for_platform``
+        from ``rattler``: when we solve for a target that the *host* cannot
+        detect a virtual package for (e.g. ``linux-64`` from macOS emits
+        no ``__glibc`` record), inject conservative defaults so packages
+        gated on those virtuals remain resolvable out of the box.
+
+        Precedence (highest to lowest):
+
+        1. ``CONDA_OVERRIDE_*`` already present in :data:`os.environ` — the
+           user is explicitly in charge and this helper returns no entry
+           for that key, leaving the existing value untouched.
+        2. ``[system-requirements]`` declared in the manifest for the same
+           virtual package (e.g. ``glibc = "2.28"``) — used as the override
+           so the virtual package record lines up with the spec constraint
+           :mod:`conda_workspaces.envs._apply_system_requirements` appends.
+        3. A conservative built-in baseline (``__glibc == 2.17`` for any
+           non-native linux target, ``__osx >= 10.15`` / ``>= 11.0`` for
+           ``osx-64`` / ``osx-arm64`` cross-compiles, presence-only
+           ``__win`` for win targets).
+
+        ``__cuda`` and ``__archspec`` are *not* seeded — the caller must
+        opt in via ``[system-requirements]`` or ``CONDA_OVERRIDE_*`` if
+        they want those available.  Native solves (target family matches
+        host family) return an empty mapping so byte-for-byte output stays
+        unchanged.
+        """
+        from conda.base.context import context as conda_context
+
+        def family(subdir: str) -> str:
+            for fam in ("linux", "osx", "win"):
+                if subdir.startswith(f"{fam}-"):
+                    return fam
+            return ""
+
+        target_family = family(platform)
+        if not target_family or family(conda_context.subdir) == target_family:
+            return {}
+
+        def req_version(name: str) -> str | None:
+            """Look up a ``[system-requirements]`` entry by bare or ``__`` name."""
+            return self.system_requirements.get(name) or self.system_requirements.get(
+                f"__{name}"
+            )
+
+        baseline: dict[str, str] = {}
+        if target_family == "linux":
+            baseline["CONDA_OVERRIDE_GLIBC"] = req_version("glibc") or "2.17"
+        elif target_family == "osx":
+            default = "11.0" if platform == "osx-arm64" else "10.15"
+            baseline["CONDA_OVERRIDE_OSX"] = req_version("osx") or default
+        elif target_family == "win":
+            baseline["CONDA_OVERRIDE_WIN"] = req_version("win") or "0"
+
+        return {k: v for k, v in baseline.items() if k not in os.environ}
+
+    @contextmanager
+    def scoped_virtual_packages(self, platform: str) -> Iterator[None]:
+        """Scope :meth:`virtual_package_overrides` around a solver call.
+
+        Conda deprecated :func:`conda.common.io.env_vars` and its siblings
+        in 26.9 (removal targeted for 27.3) and recommends
+        ``monkeypatch.setenv`` / ``monkeypatch.delenv`` as replacements —
+        but those are test-only.  This production path needs to scope
+        ``CONDA_OVERRIDE_*`` overrides around a solver call, for which
+        upstream does not ship a drop-in replacement, so we keep a small
+        local context manager until conda exposes one (tracked in
+        ``conda/conda#14095`` / PR ``conda/conda#15728``).
+        """
+        overrides = self.virtual_package_overrides(platform)
+        if not overrides:
+            yield
+            return
+        saved: dict[str, str | None] = {
+            name: os.environ.get(name) for name in overrides
+        }
+        os.environ.update(overrides)
+        try:
+            yield
+        finally:
+            for name, previous in saved.items():
+                if previous is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = previous
+
+    def solve_for_platform(
+        self,
+        platform: str,
+        *,
+        prefix: str | Path,
+    ) -> list[PackageRecord]:
+        """Solve this environment for *platform* and return package records.
+
+        Uses conda's solver API to resolve dependencies without
+        installing, producing the list of exact packages that would be
+        installed.  Applies the same transformations as
+        :func:`conda_workspaces.envs.install_environment`: PyPI deps
+        are translated and merged, system requirements are added as
+        virtual package constraints, and channel priority is honoured.
+
+        The solver is targeted at *platform* by (a) constructing it
+        with ``subdirs=(platform, "noarch")`` and (b) overriding
+        ``context._subdir`` for the duration of the solve.  Conda's
+        virtual package plugins (``__linux``, ``__osx``, ``__win``)
+        gate on ``context.subdir``, so this single override also
+        yields the correct cross-platform virtual package set.
+
+        On cross-compiled targets the host cannot detect
+        libc/kernel/macOS versions, so
+        :meth:`scoped_virtual_packages` seeds conservative
+        ``CONDA_OVERRIDE_*`` defaults for the duration of the solve.
+        User knobs stay authoritative: explicit ``CONDA_OVERRIDE_*``
+        env vars are left untouched, and ``[system-requirements]``
+        versions are lifted into the override so ``__glibc >=2.28``
+        in the manifest and the baseline record agree.
+
+        *prefix* is the environment prefix path the solver should
+        target — workspace-owned, so callers that run under a
+        :class:`~conda_workspaces.context.WorkspaceContext` pass
+        ``ctx.env_prefix(resolved.name)``.
+
+        Raises :class:`~conda_workspaces.exceptions.SolveError` when
+        the solver cannot satisfy the specs or no backend is
+        registered.
+        """
+        from conda.base.context import context as conda_context
+        from conda.common.io import captured
+        from conda.exceptions import UnsatisfiableError
+        from conda.models.match_spec import MatchSpec as CondaMatchSpec
+
+        from .envs import (
+            _apply_system_requirements,
+            _build_pypi_specs,
+            _channel_priority_override,
+        )
+        from .exceptions import SolveError
+
+        specs = [
+            CondaMatchSpec(dep.conda_build_form())
+            for dep in self.conda_dependencies.values()
+        ]
+
+        specs.extend(_build_pypi_specs(self))
+        _apply_system_requirements(self, specs)
+
+        if not specs:
+            return []
+
+        solver_backend = conda_context.plugin_manager.get_cached_solver_backend()
+        if solver_backend is None:
+            raise SolveError(self.name, "No solver backend found", platform=platform)
+
+        subdirs = (platform, "noarch")
+
+        # The solver unconditionally prints ``Collecting package
+        # metadata`` and ``Solving environment`` status lines through
+        # conda's reporter plugin (even when ``context.quiet`` is set
+        # — ``QuietSpinner`` still writes to stdout).  Route stdout
+        # and stderr through ``conda.common.io.captured`` so the Rich
+        # progress rendered by the caller is the only thing the user
+        # sees.  Any captured output is discarded; diagnostics survive
+        # via ``SolveError(str(exc))``.
+        with (
+            self.scoped_virtual_packages(platform),
+            _channel_priority_override(self.channel_priority),
+            conda_context._override("_subdir", platform),
+            conda_context._override("quiet", True),
+            captured(),
+        ):
+            solver = solver_backend(
+                str(prefix),
+                list(self.channels),
+                subdirs,
+                specs_to_add=specs,
+            )
+
+            try:
+                return list(solver.solve_final_state())
+            except (UnsatisfiableError, SystemExit) as exc:
+                raise SolveError(self.name, str(exc), platform=platform) from exc
 
 
 def resolve_environment(

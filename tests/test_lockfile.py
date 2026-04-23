@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 import pytest
@@ -10,10 +11,12 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
+from conda.base.context import context as conda_context
+from conda.models.match_spec import MatchSpec
 from conda_lockfiles.rattler_lock.v6 import _record_to_dict
 
 from conda_workspaces.context import WorkspaceContext
-from conda_workspaces.exceptions import LockfileNotFoundError
+from conda_workspaces.exceptions import LockfileNotFoundError, SolveError
 from conda_workspaces.lockfile import (
     ALIASES,
     DEFAULT_FILENAMES,
@@ -305,7 +308,7 @@ class _FakePkg:
 
 @pytest.fixture
 def fake_solver_factory(monkeypatch: pytest.MonkeyPatch):
-    """Replace ``_solve_for_records`` with a deterministic stub.
+    """Replace ``ResolvedEnvironment.solve_for_platform`` with a deterministic stub.
 
     The stub returns one package per ``(env, platform)`` pair whose URL
     encodes both, so tests can assert platform-specific records landed
@@ -317,20 +320,18 @@ def fake_solver_factory(monkeypatch: pytest.MonkeyPatch):
     def _factory(failures: set[tuple[str, str]] | None = None) -> list:
         failures = failures or set()
 
-        def fake_solve(ctx_arg, resolved, platform):
-            calls.append((resolved.name, platform))
-            if (resolved.name, platform) in failures:
-                from conda_workspaces.exceptions import SolveError
-
-                raise SolveError(resolved.name, "unsatisfiable", platform=platform)
+        def fake_solve(self, platform, *, prefix):
+            calls.append((self.name, platform))
+            if (self.name, platform) in failures:
+                raise SolveError(self.name, "unsatisfiable", platform=platform)
             return [
                 _FakePkg(
                     "python",
-                    f"https://example.com/python-{resolved.name}-{platform}.conda",
+                    f"https://example.com/python-{self.name}-{platform}.conda",
                 ),
             ]
 
-        monkeypatch.setattr("conda_workspaces.lockfile._solve_for_records", fake_solve)
+        monkeypatch.setattr(ResolvedEnvironment, "solve_for_platform", fake_solve)
         return calls
 
     return _factory
@@ -603,3 +604,134 @@ def test_install_from_lockfile(
     assert len(install_calls) == 1
     assert install_calls[0]["records"] == records_sentinel
     assert install_calls[0]["prefix"] == str(ctx.env_prefix("default"))
+
+
+@pytest.mark.parametrize(
+    ("host", "target", "expected"),
+    [
+        ("linux-64", "linux-64", {}),
+        ("linux-64", "linux-aarch64", {}),
+        ("osx-arm64", "osx-64", {}),
+        ("linux-64", "osx-arm64", {"CONDA_OVERRIDE_OSX": "11.0"}),
+        ("linux-64", "osx-64", {"CONDA_OVERRIDE_OSX": "10.15"}),
+        ("osx-arm64", "linux-64", {"CONDA_OVERRIDE_GLIBC": "2.17"}),
+        ("osx-arm64", "linux-aarch64", {"CONDA_OVERRIDE_GLIBC": "2.17"}),
+        ("linux-64", "win-64", {"CONDA_OVERRIDE_WIN": "0"}),
+        ("win-64", "linux-64", {"CONDA_OVERRIDE_GLIBC": "2.17"}),
+        ("linux-64", "noarch", {}),
+    ],
+    ids=[
+        "native-linux",
+        "linux-to-linux-cross-arch",
+        "osx-to-osx-cross-arch",
+        "linux-to-osx-arm64",
+        "linux-to-osx-64",
+        "osx-to-linux-64",
+        "osx-to-linux-aarch64",
+        "linux-to-win",
+        "win-to-linux",
+        "noarch-target",
+    ],
+)
+def test_virtual_package_overrides_by_target(
+    monkeypatch: pytest.MonkeyPatch,
+    host: str,
+    target: str,
+    expected: dict[str, str],
+) -> None:
+    """Overrides trigger only when host family differs from the target family."""
+    monkeypatch.setattr(conda_context, "_subdir", host)
+    monkeypatch.delenv("CONDA_OVERRIDE_GLIBC", raising=False)
+    monkeypatch.delenv("CONDA_OVERRIDE_OSX", raising=False)
+    monkeypatch.delenv("CONDA_OVERRIDE_WIN", raising=False)
+
+    env = ResolvedEnvironment(name="test")
+    assert env.virtual_package_overrides(target) == expected
+
+
+def test_virtual_package_overrides_respect_existing_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Explicit ``CONDA_OVERRIDE_*`` values win over the baseline."""
+    monkeypatch.setattr(conda_context, "_subdir", "osx-arm64")
+    monkeypatch.setenv("CONDA_OVERRIDE_GLIBC", "2.28")
+
+    env = ResolvedEnvironment(name="test")
+    assert env.virtual_package_overrides("linux-64") == {}
+
+
+@pytest.mark.parametrize(
+    ("system_requirements", "expected"),
+    [
+        ({}, {"CONDA_OVERRIDE_GLIBC": "2.17"}),
+        ({"glibc": "2.28"}, {"CONDA_OVERRIDE_GLIBC": "2.28"}),
+        ({"__glibc": "2.34"}, {"CONDA_OVERRIDE_GLIBC": "2.34"}),
+        ({"osx": "12.0"}, {"CONDA_OVERRIDE_GLIBC": "2.17"}),
+    ],
+    ids=[
+        "default-baseline",
+        "bare-name-wins",
+        "dunder-name-wins",
+        "unrelated-requirement-ignored",
+    ],
+)
+def test_virtual_package_overrides_lift_system_requirements(
+    monkeypatch: pytest.MonkeyPatch,
+    system_requirements: dict[str, str],
+    expected: dict[str, str],
+) -> None:
+    """``[system-requirements]`` versions are lifted into the overrides."""
+    monkeypatch.setattr(conda_context, "_subdir", "osx-arm64")
+    monkeypatch.delenv("CONDA_OVERRIDE_GLIBC", raising=False)
+
+    env = ResolvedEnvironment(name="test", system_requirements=system_requirements)
+    assert env.virtual_package_overrides("linux-64") == expected
+
+
+@pytest.mark.parametrize(
+    ("host", "target", "expected_glibc_during_solve"),
+    [
+        ("osx-arm64", "linux-64", "2.17"),
+        ("linux-64", "linux-64", None),
+    ],
+    ids=["cross-compile-seeds-baseline", "native-leaves-env-unchanged"],
+)
+def test_solve_for_platform_virtual_package_env(
+    monkeypatch: pytest.MonkeyPatch,
+    workspace_ctx_factory: Callable[..., WorkspaceContext],
+    resolved_envs_factory,
+    host: str,
+    target: str,
+    expected_glibc_during_solve: str | None,
+) -> None:
+    """``solve_for_platform`` seeds baselines only when host differs from target."""
+    monkeypatch.setattr(conda_context, "_subdir", host)
+    monkeypatch.delenv("CONDA_OVERRIDE_GLIBC", raising=False)
+
+    ctx = workspace_ctx_factory()
+    resolved = resolved_envs_factory(default=[target])["default"]
+    resolved.conda_dependencies = {"python": MatchSpec("python=3.12")}
+
+    observed: dict[str, str | None] = {}
+
+    class FakeSolver:
+        def __init__(self, *args, **kwargs) -> None:
+            observed["CONDA_OVERRIDE_GLIBC"] = os.environ.get("CONDA_OVERRIDE_GLIBC")
+            observed["_subdir"] = conda_context.subdir
+
+        def solve_final_state(self) -> list:
+            return []
+
+    monkeypatch.setattr(
+        conda_context.plugin_manager,
+        "get_cached_solver_backend",
+        lambda: FakeSolver,
+    )
+
+    resolved.solve_for_platform(target, prefix=ctx.env_prefix(resolved.name))
+
+    assert observed["CONDA_OVERRIDE_GLIBC"] == expected_glibc_during_solve
+    assert observed["_subdir"] == target
+    # After the solve, any baseline the context manager applied must
+    # have been restored — nothing leaks into the surrounding process.
+    assert os.environ.get("CONDA_OVERRIDE_GLIBC") is None

@@ -53,9 +53,11 @@
   `__main__.py` entry point (defers parser setup until invoked),
   `cli/main.py` subcommand dispatch (only the chosen handler is
   loaded), `context.py` methods (lazy by design to keep plugin load
-  under 1 ms), `lockfile.py` solver helpers inside
-  `_solve_for_records` and `install_from_lockfile` (avoids pulling
-  in heavy solver/envs machinery for lockfile-read operations),
+  under 1 ms), solver and virtual-package helpers inside
+  `ResolvedEnvironment` (`solve_for_platform`,
+  `virtual_package_overrides`, `scoped_virtual_packages`) and
+  `lockfile.install_from_lockfile` (avoids pulling in heavy
+  solver/envs machinery for lockfile-read operations),
   `template.py` where `_get_jinja_env()` lazily imports jinja2,
   `cli/task/run.py` where workspace context is lazily imported for
   environment resolution (tasks work without a workspace),
