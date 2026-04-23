@@ -102,12 +102,42 @@ def execute_quickstart(
                 " --copy/--clone is used; the copied manifest dictates the"
                 " format."
             )
-        manifest_path = _copy_manifest(
-            copy_from,
-            workspace_root,
-            dry_run=dry_run,
-            console=console,
-        )
+        # Copy the foreign manifest into the workspace, translating the
+        # various "source missing / already exists" failures into one
+        # uniform ``QuickstartCopyError`` so quickstart's error surface
+        # stays consistent.  The real work lives on :class:`ManifestParser`;
+        # we only layer dry-run preview + Rich output on top.
+        try:
+            manifest = ManifestParser.resolve_source(copy_from)
+            manifest_path = workspace_root / manifest.name
+            if manifest_path.exists():
+                raise ManifestExistsError(manifest_path)
+            if dry_run:
+                console.print(
+                    f"[bold blue]Would copy[/bold blue] [bold]{manifest}[/bold]"
+                    f" -> [bold]{manifest_path}[/bold]"
+                )
+            else:
+                ManifestParser.copy_manifest(copy_from, workspace_root)
+                console.print(
+                    f"[bold cyan]Copied[/bold cyan] [bold]{manifest.name}[/bold]"
+                    f" from [bold]{manifest.parent}[/bold]"
+                )
+        except FileNotFoundError as exc:
+            raise QuickstartCopyError(
+                f"--copy source '{copy_from}' does not exist.",
+                hints=["Pass an existing workspace directory or manifest file."],
+            ) from exc
+        except WorkspaceNotFoundError as exc:
+            raise QuickstartCopyError(
+                f"--copy source '{copy_from}' does not contain a workspace manifest.",
+                hints=list(exc.hints),
+            ) from exc
+        except ManifestExistsError as exc:
+            raise QuickstartCopyError(
+                f"'{exc.path}' already exists; refusing to overwrite.",
+                hints=["Remove the existing manifest or pick a different directory."],
+            ) from exc
     elif dry_run:
         console.print(
             "[bold blue]Would create[/bold blue] workspace manifest in"
@@ -178,56 +208,6 @@ def execute_quickstart(
         )
 
     return 0
-
-
-def _copy_manifest(
-    source: Path,
-    dest_dir: Path,
-    *,
-    dry_run: bool,
-    console: Console,
-) -> Path:
-    """CLI presentation wrapper around :meth:`ManifestParser.copy_manifest`.
-
-    Resolves *source* (dir or file) to the manifest the classmethod
-    would copy, then either previews the move (``--dry-run``) or
-    performs it.  Translates the underlying file / manifest errors
-    into :class:`QuickstartCopyError` so quickstart's error surface
-    stays uniform.
-    """
-    try:
-        manifest = ManifestParser.resolve_source(source)
-        target = dest_dir / manifest.name
-        if target.exists():
-            raise ManifestExistsError(target)
-        if dry_run:
-            console.print(
-                f"[bold blue]Would copy[/bold blue] [bold]{manifest}[/bold]"
-                f" -> [bold]{target}[/bold]"
-            )
-            return target
-        ManifestParser.copy_manifest(source, dest_dir)
-    except FileNotFoundError as exc:
-        raise QuickstartCopyError(
-            f"--copy source '{source}' does not exist.",
-            hints=["Pass an existing workspace directory or manifest file."],
-        ) from exc
-    except WorkspaceNotFoundError as exc:
-        raise QuickstartCopyError(
-            f"--copy source '{source}' does not contain a workspace manifest.",
-            hints=list(exc.hints),
-        ) from exc
-    except ManifestExistsError as exc:
-        raise QuickstartCopyError(
-            f"'{exc.path}' already exists; refusing to overwrite.",
-            hints=["Remove the existing manifest or pick a different directory."],
-        ) from exc
-
-    console.print(
-        f"[bold cyan]Copied[/bold cyan] [bold]{manifest.name}[/bold]"
-        f" from [bold]{manifest.parent}[/bold]"
-    )
-    return target
 
 
 __all__ = ["execute_quickstart"]
