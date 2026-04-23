@@ -387,29 +387,10 @@ def merge_lockfiles(paths: Sequence[Path], ctx: WorkspaceContext) -> Path:
     Returns the path to the merged lockfile.
     """
     from conda.common.serialize.yaml import dump as yaml_dump
+    from conda_lockfiles.load_yaml import load_yaml
 
     if not paths:
         raise LockfileMergeError("no lockfile fragments were supplied")
-
-    merged = _compose_lockfile_dict(paths)
-
-    out_path = lockfile_path(ctx)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    buf = io.StringIO()
-    yaml_dump(merged, buf)
-    out_path.write_text(buf.getvalue(), encoding="utf-8")
-    return out_path
-
-
-def _compose_lockfile_dict(paths: Sequence[Path]) -> dict[str, Any]:
-    """Validate and fold every fragment in *paths* into a single lockfile dict.
-
-    Raises :class:`LockfileMergeError` on any validation failure.  The
-    returned dict shape matches what :meth:`CondaLockLoader.compose`
-    emits, guaranteeing byte-stable output once passed through the same
-    YAML dumper.
-    """
-    from conda_lockfiles.load_yaml import load_yaml
 
     env_order: list[str] = []
     env_channels: dict[str, list[dict[str, Any]]] = {}
@@ -482,7 +463,7 @@ def _compose_lockfile_dict(paths: Sequence[Path]) -> dict[str, Any]:
                     merged_packages.append(record)
                     emitted_urls.add(url)
 
-    return {
+    merged = {
         "version": LOCKFILE_VERSION,
         "environments": {
             name: {
@@ -496,6 +477,13 @@ def _compose_lockfile_dict(paths: Sequence[Path]) -> dict[str, Any]:
         },
         "packages": merged_packages,
     }
+
+    out_path = lockfile_path(ctx)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    buf = io.StringIO()
+    yaml_dump(merged, buf)
+    out_path.write_text(buf.getvalue(), encoding="utf-8")
+    return out_path
 
 
 def install_from_lockfile(ctx: WorkspaceContext, env_name: str) -> None:

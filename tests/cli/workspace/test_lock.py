@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 from conda.exceptions import CondaValueError
 
-from conda_workspaces.cli.workspace.lock import _expand_merge_paths, execute_lock
+from conda_workspaces.cli.workspace.lock import execute_lock
 from conda_workspaces.exceptions import EnvironmentNotFoundError, PlatformError
 
 from ..conftest import make_args
@@ -211,8 +211,19 @@ def test_lock_merge_glob_expansion(
     (pixi_workspace / "conda.lock.linux-64").write_text("x", encoding="utf-8")
     (pixi_workspace / "conda.lock.osx-arm64").write_text("x", encoding="utf-8")
 
-    paths = _expand_merge_paths(["conda.lock.*"])
-    names = sorted(p.name for p in paths)
+    seen_paths: list[list] = []
+
+    def fake_merge(paths, ctx):
+        seen_paths.append(list(paths))
+        return pixi_workspace / "conda.lock"
+
+    monkeypatch.setattr(
+        "conda_workspaces.cli.workspace.lock.merge_lockfiles", fake_merge
+    )
+
+    assert execute_lock(make_args(_DEFAULTS, merge=["conda.lock.*"])) == 0
+    assert len(seen_paths) == 1
+    names = sorted(p.name for p in seen_paths[0])
     assert names == ["conda.lock.linux-64", "conda.lock.osx-arm64"]
 
 

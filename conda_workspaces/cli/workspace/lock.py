@@ -19,36 +19,6 @@ if TYPE_CHECKING:
     from ...exceptions import SolveError
 
 
-def _expand_merge_paths(patterns: list[str]) -> list[Path]:
-    """Expand ``--merge`` values (plain paths or globs) into ``Path`` objects.
-
-    Each pattern is resolved relative to the current working directory.
-    Literal paths are kept as-is; glob patterns go through
-    :meth:`pathlib.Path.glob`.  Results are deduplicated while
-    preserving first-seen order so the merged output stays stable when
-    a user passes overlapping globs.
-    """
-    cwd = Path.cwd()
-    paths: list[Path] = []
-    seen: set[Path] = set()
-    for pattern in patterns:
-        raw = Path(pattern)
-        if any(ch in pattern for ch in "*?["):
-            if raw.is_absolute():
-                anchor = Path(raw.anchor)
-                matches = sorted(anchor.glob(str(raw.relative_to(raw.anchor))))
-            else:
-                matches = sorted(cwd.glob(pattern))
-        else:
-            matches = [raw if raw.is_absolute() else cwd / raw]
-        for match in matches:
-            resolved = match.resolve()
-            if resolved not in seen:
-                seen.add(resolved)
-                paths.append(match)
-    return paths
-
-
 def execute_lock(args: argparse.Namespace, *, console: Console | None = None) -> int:
     """Solve workspace environments and write ``conda.lock``."""
     if console is None:
@@ -67,7 +37,28 @@ def execute_lock(args: argparse.Namespace, *, console: Console | None = None) ->
                 "--merge cannot be combined with --environment, --platform,"
                 " --skip-unsolvable, or --output."
             )
-        fragments = _expand_merge_paths(merge_patterns)
+        # Expand --merge values (plain paths or glob patterns) relative
+        # to the current working directory, deduplicating while
+        # preserving first-seen order so the merged output stays stable
+        # when a user passes overlapping globs.
+        cwd = Path.cwd()
+        fragments: list[Path] = []
+        seen: set[Path] = set()
+        for pattern in merge_patterns:
+            raw = Path(pattern)
+            if any(ch in pattern for ch in "*?["):
+                if raw.is_absolute():
+                    anchor = Path(raw.anchor)
+                    matches = sorted(anchor.glob(str(raw.relative_to(raw.anchor))))
+                else:
+                    matches = sorted(cwd.glob(pattern))
+            else:
+                matches = [raw if raw.is_absolute() else cwd / raw]
+            for match in matches:
+                resolved = match.resolve()
+                if resolved not in seen:
+                    seen.add(resolved)
+                    fragments.append(match)
         if not fragments:
             raise CondaValueError(
                 "--merge matched no files; check the pattern and try again."
