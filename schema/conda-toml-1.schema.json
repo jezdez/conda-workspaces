@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://schemas.conda.org/conda-toml-1.schema.json",
   "title": "conda.toml",
-  "description": "Schema for conda.toml workspace manifests used by conda-workspaces.",
+  "description": "Schema for conda.toml workspace manifests used by conda-workspaces. Normative reference: https://conda-incubator.github.io/conda-workspaces/reference/conda-toml-spec/",
   "type": "object",
   "required": ["workspace"],
   "properties": {
@@ -42,6 +42,10 @@
       "additionalProperties": {
         "$ref": "#/$defs/environment"
       }
+    },
+    "tasks": {
+      "$ref": "#/$defs/tasks",
+      "description": "Top-level (default feature) tasks runnable via 'conda task run <name>'."
     }
   },
   "additionalProperties": false,
@@ -106,6 +110,10 @@
           "type": "string",
           "description": "Channel priority mode for the solver.",
           "enum": ["strict", "flexible", "disabled"]
+        },
+        "envs-dir": {
+          "type": "string",
+          "description": "Where per-environment prefixes are written, relative to the workspace root.  Default: '.conda/envs'."
         }
       },
       "required": ["channels", "platforms"],
@@ -253,13 +261,17 @@
     },
     "targetOverride": {
       "type": "object",
-      "description": "Platform-specific dependency overrides.",
+      "description": "Platform-specific overrides.",
       "properties": {
         "dependencies": {
           "$ref": "#/$defs/condaDependencies"
         },
         "pypi-dependencies": {
           "$ref": "#/$defs/pypiDependencies"
+        },
+        "tasks": {
+          "$ref": "#/$defs/tasks",
+          "description": "Platform-specific task overrides."
         }
       },
       "additionalProperties": false
@@ -297,9 +309,125 @@
         },
         "target": {
           "$ref": "#/$defs/targets"
+        },
+        "tasks": {
+          "$ref": "#/$defs/tasks",
+          "description": "Tasks contributed by this feature (merged into the workspace task set)."
         }
       },
       "additionalProperties": false
+    },
+    "tasks": {
+      "type": "object",
+      "description": "Tasks runnable via 'conda task run <name>', keyed by task name.",
+      "additionalProperties": {
+        "$ref": "#/$defs/task"
+      }
+    },
+    "task": {
+      "description": "A task definition: either a command string/array or a task table.",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Shell command to execute."
+        },
+        {
+          "type": "array",
+          "description": "Argv-style command (no shell).",
+          "items": { "type": "string" }
+        },
+        {
+          "type": "object",
+          "description": "Detailed task table.",
+          "properties": {
+            "cmd": {
+              "description": "Command to execute.  Omit to define an alias whose only purpose is 'depends-on'.",
+              "oneOf": [
+                { "type": "string" },
+                { "type": "array", "items": { "type": "string" } }
+              ]
+            },
+            "args": {
+              "type": "array",
+              "description": "Named arguments with optional defaults.",
+              "items": { "$ref": "#/$defs/taskArg" }
+            },
+            "depends-on": {
+              "type": "array",
+              "description": "Tasks to run before this one.",
+              "items": { "$ref": "#/$defs/taskDep" }
+            },
+            "cwd": {
+              "type": "string",
+              "description": "Working directory for the task."
+            },
+            "env": {
+              "type": "object",
+              "description": "Environment variables to set.",
+              "additionalProperties": { "type": "string" }
+            },
+            "description": {
+              "type": "string",
+              "description": "Human-readable description."
+            },
+            "inputs": {
+              "type": "array",
+              "description": "Glob patterns for cache inputs.",
+              "items": { "type": "string" }
+            },
+            "outputs": {
+              "type": "array",
+              "description": "Glob patterns for cache outputs.",
+              "items": { "type": "string" }
+            },
+            "clean-env": {
+              "type": "boolean",
+              "description": "Run with a minimal environment."
+            },
+            "default-environment": {
+              "type": "string",
+              "description": "Conda environment to activate by default for this task."
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "taskArg": {
+      "type": "object",
+      "description": "A named task argument with an optional default.",
+      "properties": {
+        "arg": { "type": "string", "description": "Argument name." },
+        "default": { "type": "string", "description": "Default value." }
+      },
+      "required": ["arg"],
+      "additionalProperties": false
+    },
+    "taskDep": {
+      "description": "A task dependency: either a task name or an inline table.",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Name of another task."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "task": { "type": "string", "description": "Name of another task." },
+            "args": {
+              "type": "array",
+              "description": "Positional argument values for the named task.",
+              "items": { "type": "string" }
+            },
+            "environment": {
+              "type": "string",
+              "description": "Environment to run the dependency in."
+            }
+          },
+          "required": ["task"],
+          "additionalProperties": false
+        }
+      ]
     },
     "environment": {
       "description": "A named environment composed from features.",

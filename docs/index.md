@@ -185,6 +185,8 @@ tutorials/ci-pipeline
 reference/cli
 reference/api
 configuration
+reference/conda-toml-spec
+reference/format-aliases
 ```
 
 ```{toctree}
