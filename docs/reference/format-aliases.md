@@ -38,3 +38,8 @@ The single source of truth for these constants is
 `conda_workspaces/env_spec.py` (manifest) and
 `conda_workspaces/lockfile.py` (lockfile); `plugin.py` and
 `export.py` import from there so the three code paths never drift.
+
+For the normative description of the `conda.toml` format itself —
+required fields, types, semantics, the `pyproject.toml` embedded form,
+and the `conda.lock` schema relationship — see the [`conda.toml`
+specification](conda-toml-spec.md).

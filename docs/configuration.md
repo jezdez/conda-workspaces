@@ -3,6 +3,12 @@
 conda-workspaces searches for manifests in the current directory and its
 parents. The first matching file is used.
 
+For the normative description of every field accepted in `conda.toml` and
+the `[tool.conda.*]` embedded form, see the [`conda.toml`
+specification](reference/conda-toml-spec.md). This page is the
+how-to companion: it shows full examples and table summaries grouped by
+task.
+
 ## Workspace search order
 
 1. `conda.toml` — conda-native workspace manifest
